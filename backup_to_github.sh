@@ -1,5 +1,5 @@
 #!/bin/bash
-
+#Script which syncs my work from my VM o github; as VM does not have internet connectivity
 scp -r -P 2222 mininet@127.0.0.1:/home/mininet/cs144_lab3/router ./ || { echo 'scp failed'; exit 1; }
 git status
 git add . 
