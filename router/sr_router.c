@@ -134,7 +134,7 @@ uint8_t ip_dst, unsigned int len){
 
 /*---------------------------------------------------------------------------
 * Method: add_icmp_headers(struct sr_instance *sr, uint8_t type, uint8_t sum,
-* unsigned int len);
+* uint8_t code, unsigned int len);
 *
 * This function takes a preallocated packet with length len, a router instance,
 * and source/destination type/code information and fills the packet with info
@@ -264,6 +264,69 @@ void handle_ip_packet_to_be_sent_out(struct sr_instance *sr, uint8_t
 		/*free(outgoing_interface); TODO see if we have to do this */
 		free(new_packet);
 	}
+}
+
+/*----------------------------------------------------------------------
+* Method: 
+*
+*---------------------------------------------------------------------*/
+
+/*---------------------------------------------------------------------------
+* Method: add_icmp3_headers(struct sr_instance *sr, uint8_t type, uint8_t sum,
+* uint8_t code, unsigned int len);
+*
+* This function takes a preallocated packet with length len, a router instance,
+* and source/destination type/code information and fills the packet with info
+* related to the icmp3 header. Also recalculates the icmp3 checksum.
+*
+*---------------------------------------------------------------------------*/
+ 
+void add_icmp3_headers(struct sr_instance *sr, uint8_t *packet, uint8_t type,
+uint8_t code, unsigned int len){
+  assert(len >= sizeof(struct sr_icmp_t3_hdr));
+  struct sr_icmp_t3_hdr *icmp3_hdr = (struct sr_icmp_t3_hdr*)packet;
+  assert(icmp3_hdr);
+  icmp3_hdr->icmp_sum = 0; /*Init so no segfault for uninitialized memory */
+  icmp3_hdr->icmp_type = type;
+  icmp3_hdr->icmp_code = code;
+	icmp3_hdr->unused = 0x00;
+	icmp3_hdr->next_mtu = 0x00;
+  icmp3_hdr->icmp_sum = cksum(packet, sizeof(struct sr_icmp_hdr));
+  return;
+}
+
+/*----------------------------------------------------------------------
+* Method: sr_prep_and_send_icmp3_reply(struct sr_instance *sr, 
+* uint8_t *packet, unsigned int len, char *interface, uint32_t ip_src,
+* uint32_t ip_dst, uint8_t ether_shost[ETHER_ADDR_LEN], uint8_t 
+* ether_dhost[ETHER_ADDR_LEN], uint8_t type, uint8_t code);
+*
+* This method prepares and sends an icmp3 reply to the given destination,
+* with the given type and code. The packet argument should be a pre-
+* allocated space with enough room for ethernet, ip and ICMP3 headers.
+*
+*----------------------------------------------------------------------*/
+
+void sr_prep_and_send_icmp3_reply(struct sr_instance *sr, 
+uint8_t *packet, unsigned int len, char *interface, uint32_t ip_src,
+uint32_t ip_dst, uint8_t ether_shost[ETHER_ADDR_LEN], uint8_t 
+ether_dhost[ETHER_ADDR_LEN], uint8_t type, uint8_t code){
+	assert(packet);
+	unsigned int min_total_len = sizeof(sr_ethernet_hdr_t) + sizeof(
+	  sr_ip_hdr_t) + sizeof(sr_icmp_t3_hdr_t);
+	unsigned int icmp3_offset = sizeof(sr_ethernet_hdr_t) + sizeof(
+		sr_ip_hdr_t);
+	unsigned int ip_offset = sizeof(sr_ethernet_hdr_t);
+	assert(len >= min_total_len); 
+	add_icmp3_headers(sr, packet + icmp3_offset, type, code,
+		len - icmp3_offset);
+	add_ip_headers(sr, packet + ip_offset, ip_src, ip_dst, len - ip_offset);
+	add_ethernet_headers(sr, packet, interface, ether_dhost);
+	sr_ethernet_hdr_t *ethernet_packet = (sr_ethernet_hdr_t*)packet;
+	assert(ethernet_packet);
+	memcpy(ethernet_packet->ether_shost, ether_shost, ETHER_ADDR_LEN);
+  sr_send_packet(sr, packet, len, interface);
+	return;
 }
 
 /*----------------------------------------------------------------------
