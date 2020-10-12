@@ -113,6 +113,21 @@ void add_ethernet_headers(struct sr_instance *sr, uint8_t
 
 void add_ip_headers(struct sr_instance *sr, uint8_t *packet, uint8_t ip_src,
 uint8_t ip_dst, unsigned int len){
+	assert(len >= sizeof(sr_ip_hdr_t));
+	sr_ip_hdr_t *ip_hdr = (sr_ip_hdr_t*)packet;
+	assert(ip_hdr);
+	ip_hdr->ip_v = 0x04;
+	ip_hdr->ip_hl = 0x05; /*TODO Check that this is the right value */
+	ip_hdr->ip_tos = 0x00;
+	ip_hdr->ip_len = len; /*Length, including data e.g. ICMP hdr if present*/
+	ip_hdr->ip_id = 0x00; /*TODO: Figure this out*/
+	ip_hdr->ip_off = 0x00; /*TODO: Check if this is correct*/
+	ip_hdr->ip_ttl = 64;
+	ip_hdr->ip_p = 0x00;
+	ip_hdr->ip_src = ip_src;
+	ip_hdr->ip_dst = ip_dst;
+	ip_hdr->ip_sum = 0; /*To prevent segfaults from uninitialized memory*/
+	ip_hdr->ip_sum = cksum(packet, sizeof(sr_ip_hdr_t));
 	return;
 
 }
@@ -130,7 +145,7 @@ uint8_t ip_dst, unsigned int len){
 void add_icmp_headers(struct sr_instance *sr, uint8_t *packet, uint8_t type,
 uint8_t code, unsigned int len){
 	assert(len >= sizeof(struct sr_icmp_hdr));
-	struct sr_icmp_hdr *icmp_hdr = (sr_icmp_hdr*)packet;
+	struct sr_icmp_hdr *icmp_hdr = (struct sr_icmp_hdr*)packet;
 	assert(icmp_hdr);
 	icmp_hdr->icmp_sum = 0; /*Init so no segfault for uninitialized memory */
 	icmp_hdr->icmp_type = type;
