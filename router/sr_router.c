@@ -128,7 +128,14 @@ uint8_t ip_dst, unsigned int len){
 *---------------------------------------------------------------------------*/
 
 void add_icmp_headers(struct sr_instance *sr, uint8_t *packet, uint8_t type,
-uint8_t sum, unsigned int len){
+uint8_t code, unsigned int len){
+	assert(len >= sizeof(struct sr_icmp_hdr));
+	struct sr_icmp_hdr *icmp_hdr = (sr_icmp_hdr*)packet;
+	assert(icmp_hdr);
+	icmp_hdr->icmp_sum = 0; /*Init so no segfault for uninitialized memory */
+	icmp_hdr->icmp_type = type;
+	icmp_hdr->icmp_code = code;
+	icmp_hdr->icmp_sum = cksum(packet, sizeof(struct sr_icmp_hdr));
 	return;
 }
 
