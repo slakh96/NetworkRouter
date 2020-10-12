@@ -101,6 +101,36 @@ void add_ethernet_headers(struct sr_instance *sr, uint8_t
 	}
 	memcpy(casted_packet->ether_shost, (uint8_t*)outgoing_interface->addr, 6);
 }
+/*----------------------------------------------------------------------------
+* Method: add_ip_headers(struct sr_instance *sr, uint8_t *packet, 
+* uint8_t ip_src, uint8_t ip_dst, unsigned int len);
+*
+* This function takes a pre-allocated packet and adds ip information to it, 
+* including src and destination ip addresses. Also puts in the default ip info
+* and recalculates the checksum.
+*
+*---------------------------------------------------------------------------*/
+
+void add_ip_headers(struct sr_instance *sr, uint8_t *packet, uint8_t ip_src,
+uint8_t ip_dst, unsigned int len){
+	return;
+
+}
+
+/*---------------------------------------------------------------------------
+* Method: add_icmp_headers(struct sr_instance *sr, uint8_t type, uint8_t sum,
+* unsigned int len);
+*
+* This function takes a preallocated packet with length len, a router instance,
+* and source/destination type/code information and fills the packet with info
+* related to the icmp header. Also recalculates the icmp checksum.
+*
+*---------------------------------------------------------------------------*/
+
+void add_icmp_headers(struct sr_instance *sr, uint8_t *packet, uint8_t type,
+uint8_t sum, unsigned int len){
+	return;
+}
 
 /*---------------------------------------------------------------------
 * Method: prepare_to_send_ip_req(struct sr_instance *sr, uint8_t
@@ -193,6 +223,7 @@ void handle_ip_packet_to_be_sent_out(struct sr_instance *sr, uint8_t
 		sr_handle_arpreq(sr, arp_req);
 	}
 	else { /*MAC addr found; create and send IP request*/
+		/*TODO: Also recompute the checksum*/
 		printf("Found MAC; sending IP request\n");
 		uint8_t *new_packet = prepare_to_send_ip_req(sr, packet, len, 
 		interface, arp_cache_entry);
@@ -213,6 +244,36 @@ void handle_ip_packet_to_be_sent_out(struct sr_instance *sr, uint8_t
 	}
 }
 
+/*---------------------------------------------------------------------
+* Method: sr_handle_icmp_request(struct sr_instance *sr, uint8_t *packet,
+* unsigned int len, char *interface)
+*
+* This method is called whenever an ICMP request arrives. It checks if
+* the request is an echo request and if so sends an ICMP reply back to
+* the sender. Else it ignores the packet.
+*
+*--------------------------------------------------------------------*/
+void sr_handle_icmp_request(struct sr_instance *sr, uint8_t *packet,
+unsigned int len, char *interface){
+
+	sr_icmp_hdr_t *icmp_packet = (sr_icmp_hdr_t*)(packet +\
+		sizeof(sr_ip_hdr_t));
+	assert(icmp_packet);
+	uint16_t calculated_sum = cksum(packet + sizeof(sr_ip_hdr_t), \
+		len - sizeof(sr_ip_hdr_t));
+	if (calculated_sum != icmp_packet->icmp_sum){
+		printf("Checksum of ICMP invalid");
+		/*TODO: How to handle this case?*/
+		return;
+	}
+	if (icmp_packet->icmp_type == 0x08 && icmp_packet->icmp_code == 0x00) {
+		/*Echo request*/
+		/*sr_prep_and_send_icmp_reply(sr, packet, len, interface);*/
+	}
+
+
+	
+}
 
 /*---------------------------------------------------------------------
 * Method: process_ip_packet(struct sr_instance* sr, uint8_t *packet, 
@@ -252,6 +313,14 @@ int len, char *interface){
 	if (addressed_interface != NULL){
 		printf("Found a packet addressed to this router\n");
 		/* TODO: Handle packets addressed to this router */
+		if (ip_packet->ip_p == ip_protocol_icmp) {
+			sr_handle_icmp_request(sr, packet, len, interface);
+		}
+		else if (ip_packet->ip_p == 0x0006 || ip_packet->ip_p == 0x0011){
+			printf("Found TCP or UDP packet addressed to us\n");
+			/*TODO: Send back net unreachable ICMP3 request*/
+			return;
+		}
 	}
 
 	/* If the code reaches here, it is not addressed to this router */

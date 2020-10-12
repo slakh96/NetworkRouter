@@ -6,10 +6,10 @@ git add .
 echo 'Enter commit message here, or enter to skip:'
 read msg
 if [ ! -z "$msg" ]; then
-	git commit -m "$msg" || exit 1
+	git commit -a -m "$msg" || exit 1
 	git push || exit 1
 else
-	git commit -m "Updated router code" || exit 1
+	git commit -a -m "Updated router code" || exit 1
 	git push || exit 1
 fi
 echo 'Code backed up to Github'
