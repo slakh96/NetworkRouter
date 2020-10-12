@@ -281,7 +281,21 @@ void handle_ip_packet_to_be_sent_out(struct sr_instance *sr, uint8_t
 void sr_prep_and_send_icmp_reply(struct sr_instance *sr, uint8_t *packet, 
 unsigned int len, char *interface, uint32_t ip_src, uint32_t ip_dst, 
 uint8_t ether_shost[ETHER_ADDR_LEN], uint8_t ether_dhost[ETHER_ADDR_LEN]) {
-	
+	assert(packet);
+	unsigned int min_total_len = sizeof(sr_ethernet_hdr_t) + sizeof(
+		sr_ip_hdr_t) + sizeof(sr_icmp_hdr_t);
+	unsigned int icmp_offset = sizeof(sr_ethernet_hdr_t) + sizeof(
+		sr_ip_hdr_t);
+	unsigned int ip_offset = sizeof(sr_ethernet_hdr_t);
+	assert(len >= min_total_len);
+	add_icmp_headers(sr, packet + icmp_offset, 0x00, 0x00, 
+		len - icmp_offset);
+	add_ip_headers(sr, packet + ip_offset, ip_src, ip_dst, len - ip_offset);
+	add_ethernet_headers(sr, packet, interface, ether_dhost);
+	sr_ethernet_hdr_t *ethernet_packet = (sr_ethernet_hdr_t*)packet;
+	assert(ethernet_packet);
+	memcpy(ethernet_packet->ether_shost, ether_shost, ETHER_ADDR_LEN);
+	sr_send_packet(sr, packet, len, interface);
 	return;
 
 }
