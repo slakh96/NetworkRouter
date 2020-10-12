@@ -88,18 +88,26 @@ uint32_t ip_dst) {
 *--------------------------------------------------------------------*/
 void add_ethernet_headers(struct sr_instance *sr, uint8_t 
 *packet, char *interface, unsigned char mac[6]){
+
+	printf("Reached add_ethernet_headers function\n");
+	assert(sr);
+	assert(packet);
+	assert(interface);
 	sr_ethernet_hdr_t *casted_packet = (sr_ethernet_hdr_t *)(packet);
 	assert(casted_packet);
+
 	casted_packet->ether_type = ethertype_ip;
-	memcpy(casted_packet->ether_dhost, (uint8_t*)mac, 6); /*TODO: Check if this is ok*/
+	memcpy(casted_packet->ether_dhost, (uint8_t*)mac, 6);
+
 	/* Find the src address from the outgoing interface */
 	struct sr_if *outgoing_interface = sr_get_interface(sr, interface);
 	if (outgoing_interface == 0) {
-		printf("An error occurred; outgoing interface not found");
+		fprintf(stderr, "An error occurred; outgoing interface not found\n");
 		/*TODO: Figure out how to handle this*/
 		return;
 	}
 	memcpy(casted_packet->ether_shost, (uint8_t*)outgoing_interface->addr, 6);
+	return;
 }
 /*----------------------------------------------------------------------------
 * Method: add_ip_headers(struct sr_instance *sr, uint8_t *packet, 

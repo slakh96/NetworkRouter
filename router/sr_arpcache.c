@@ -19,6 +19,7 @@
 */
 struct sr_arp_hdr create_arp_hdr(unsigned short ar_op, uint32_t ar_sip,
 uint32_t ar_tip, unsigned char ar_sha[6], unsigned char ar_tha[6]){
+
 	struct sr_arp_hdr arp_hdr;
 	arp_hdr.ar_op = ar_op;
 	arp_hdr.ar_sip = ar_sip;
@@ -42,11 +43,12 @@ uint32_t ar_tip, unsigned char ar_sha[6], unsigned char ar_tha[6]){
 void sr_prep_and_send_arpreq(struct sr_instance *sr, char *interface,
 unsigned short ar_op, uint32_t ar_sip,
 uint32_t ar_tip, unsigned char ar_sha[6], unsigned char ar_tha[6]){
-	
+
+	printf("Reached sr_prep_and_send_arpreq\n");
 	assert(sr);
 	assert(interface);
-
-	unsigned int eth_pkt_size = sizeof(struct sr_arp_hdr) + sizeof(sr_ethernet_hdr_t);
+	unsigned int eth_pkt_size = sizeof(struct sr_arp_hdr) +\
+		sizeof(sr_ethernet_hdr_t);
 	uint8_t *packet_with_ethernet =\
 		(uint8_t*)malloc(eth_pkt_size);
 	assert(packet_with_ethernet);
@@ -58,7 +60,13 @@ uint32_t ar_tip, unsigned char ar_sha[6], unsigned char ar_tha[6]){
 	/*Add the arp part to the request which already has ethernet headers*/
 	memcpy(packet_with_ethernet + sizeof(sr_ethernet_hdr_t), &created_arp_hdr, 
 		sizeof(struct sr_arp_hdr));
-	sr_send_packet(sr, packet_with_ethernet, eth_pkt_size, interface);
+	int status = sr_send_packet(sr, packet_with_ethernet, eth_pkt_size,
+		interface);
+	if (status != 0){
+		fprintf(stderr, "Error when sending ARP req\n");
+		free(packet_with_ethernet);
+		return;
+	}
 	free(packet_with_ethernet);
 }
 
@@ -118,21 +126,42 @@ struct sr_if *find_addressed_interface(struct sr_instance *sr, uint32_t ip){
 	return NULL;
 }
 
+/*
+	This function handles an incoming ARP reply; adds the mapping to the cache, 
+	and sends out each packet which was waiting for this IP->MAC mapping.
+*/
+
 void sr_handle_arp_reply(struct sr_instance *sr, sr_arp_hdr_t* arp_header,
 unsigned int len, char *interface){
+
+	printf("Reached sr_handle_arp_reply function\n");
+	assert(sr);
+	assert(arp_header);
+	assert(interface);
+	
+	/*Insert new mapping into the cache*/
 	struct sr_arpreq *arpreq = sr_arpcache_insert(&(sr->cache), 
 	arp_header->ar_sha, arp_header->ar_sip);
 	if (arpreq == NULL){
 		return; /*No packets were waiting on this mapping*/
 	}
+
+	/*Go through each waiting packet and send it*/
 	struct sr_packet *cur_packet = arpreq->packets;
 	while (cur_packet != NULL){
 		sr_ethernet_hdr_t *ethernet_buf = (sr_ethernet_hdr_t*)cur_packet->buf;
+		assert(ethernet_buf);
+
 		/*Set the newly discovered destination MAC address*/
 		memcpy(ethernet_buf->ether_dhost, arp_header->ar_sha, ETHER_ADDR_LEN);
-		sr_send_packet(sr, cur_packet->buf, cur_packet->len, cur_packet->iface);
+		int status = sr_send_packet(sr, cur_packet->buf, cur_packet->len,
+			cur_packet->iface);
+		if (status != 0){
+			fprintf(stderr, "Error when sending a queued packet\n");
+		}
 		cur_packet = cur_packet->next;
 	}
+	/*Delete the ARP request once all of the packets have been sent */
 	sr_arpreq_destroy(&(sr->cache), arpreq);
 
 }
@@ -150,25 +179,29 @@ unsigned int len, char *interface){
 
 void sr_handle_arp_packet(struct sr_instance *sr, uint8_t *packet, unsigned
 int len, char *interface){
+	
+	printf("Reached the sr_handle_arp_packet function\n");
 	assert(sr);
 	assert(packet);
 	assert(interface);
 	assert(len >= sizeof(sr_arp_hdr_t));
-
 	sr_arp_hdr_t *arp_header = (sr_arp_hdr_t*)packet;
 	assert(arp_header);
+
+	/*Determine if ARP packet is addressed to us */
 	struct sr_if *addressed_interface =\
 		find_addressed_interface(sr, arp_header->ar_tip);
 	if (addressed_interface == NULL){
-		printf("This ARP packet is not addressed to us; ignore");
+		printf("This ARP packet is not addressed to us; ignore\n");
 		return;
 	}
 	if (arp_header->ar_op == arp_op_request){
 		/*The sender needs a MAC addr from us*/
+
+		/*Reverse the send and receiving addresses to send back*/
 		uint32_t dst_ip = arp_header->ar_sip;
 		uint32_t src_ip = addressed_interface->ip;
-		/*unsigned char src_mac[ETHER_ADDR_LEN] = addressed_interface->addr;
-		unsigned char dst_mac[ETHER_ADDR_LEN] = arp_header->ar_sha;*/
+		
 		sr_prep_and_send_arpreq(sr, interface, arp_hrd_ethernet, src_ip, 
 			dst_ip, addressed_interface->addr, arp_header->ar_sha);
 	
