@@ -266,6 +266,26 @@ void handle_ip_packet_to_be_sent_out(struct sr_instance *sr, uint8_t
 	}
 }
 
+/*----------------------------------------------------------------------
+* Method: sr_prep_and_send_icmp_reply(struct sr_instance *sr, 
+* uint8_t *packet, unsigned int len, char *interface, uint32_t ip_src,
+* uint32_t ip_dst, uint8_t ether_shost[ETHER_ADDR_LEN], uint8_t 
+* ether_dhost[ETHER_ADDR_LEN]);
+*
+* This method prepares and sends an icmp echo reply back to the sender.
+* The packet argument should be a pre-allocated space with enough room
+* for ethernet, ip, and ICMP headers.
+*
+*---------------------------------------------------------------------*/
+
+void sr_prep_and_send_icmp_reply(struct sr_instance *sr, uint8_t *packet, 
+unsigned int len, char *interface, uint32_t ip_src, uint32_t ip_dst, 
+uint8_t ether_shost[ETHER_ADDR_LEN], uint8_t ether_dhost[ETHER_ADDR_LEN]) {
+	
+	return;
+
+}
+
 /*---------------------------------------------------------------------
 * Method: sr_handle_icmp_request(struct sr_instance *sr, uint8_t *packet,
 * unsigned int len, char *interface)
@@ -277,12 +297,15 @@ void handle_ip_packet_to_be_sent_out(struct sr_instance *sr, uint8_t
 *--------------------------------------------------------------------*/
 void sr_handle_icmp_request(struct sr_instance *sr, uint8_t *packet,
 unsigned int len, char *interface){
-
-	sr_icmp_hdr_t *icmp_packet = (sr_icmp_hdr_t*)(packet +\
-		sizeof(sr_ip_hdr_t));
+	unsigned int icmp_offset = sizeof(sr_ethernet_hdr_t) + sizeof(
+		sr_ip_hdr_t);
+	sr_icmp_hdr_t *icmp_packet = (sr_icmp_hdr_t*)(packet + icmp_offset);
 	assert(icmp_packet);
-	uint16_t calculated_sum = cksum(packet + sizeof(sr_ip_hdr_t), \
-		len - sizeof(sr_ip_hdr_t));
+	sr_ethernet_hdr_t *ethernet_header = (sr_ethernet_hdr_t*)packet;
+	assert(ethernet_header);
+	sr_ip_hdr_t *ip_header = (sr_ip_hdr_t*)(packet + sizeof(sr_ethernet_hdr_t));
+	assert(ip_header);
+	uint16_t calculated_sum = cksum(packet + icmp_offset, len - icmp_offset);
 	if (calculated_sum != icmp_packet->icmp_sum){
 		printf("Checksum of ICMP invalid");
 		/*TODO: How to handle this case?*/
@@ -290,7 +313,9 @@ unsigned int len, char *interface){
 	}
 	if (icmp_packet->icmp_type == 0x08 && icmp_packet->icmp_code == 0x00) {
 		/*Echo request*/
-		/*sr_prep_and_send_icmp_reply(sr, packet, len, interface);*/
+		sr_prep_and_send_icmp_reply(sr, packet, len, interface, ip_header->ip_dst,
+			ip_header->ip_src, ethernet_header->ether_dhost, 
+			ethernet_header->ether_shost);
 	}
 
 
@@ -338,7 +363,8 @@ int len, char *interface, uint8_t* packet_with_ethernet){
 		printf("Found a packet addressed to this router\n");
 		/* TODO: Handle packets addressed to this router */
 		if (ip_packet->ip_p == ip_protocol_icmp) {
-			sr_handle_icmp_request(sr, packet_with_ethernet, len, interface);
+			sr_handle_icmp_request(sr, packet_with_ethernet, len + 
+			sizeof(sr_ethernet_hdr_t), interface);
 		}
 		else if (ip_packet->ip_p == 0x0006 || ip_packet->ip_p == 0x0011){
 			printf("Found TCP or UDP packet addressed to us\n");
