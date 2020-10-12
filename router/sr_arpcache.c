@@ -21,13 +21,13 @@ struct sr_arp_hdr create_arp_hdr(unsigned short ar_op, uint32_t ar_sip,
 uint32_t ar_tip, unsigned char ar_sha[6], unsigned char ar_tha[6]){
 
 	struct sr_arp_hdr arp_hdr;
-	arp_hdr.ar_op = ar_op;
+	arp_hdr.ar_op = htons(ar_op);
 	arp_hdr.ar_sip = ar_sip;
 	arp_hdr.ar_tip = ar_tip;
 	memcpy(arp_hdr.ar_sha, ar_sha, 6);
 	memcpy(arp_hdr.ar_tha, ar_tha, 6);
-	arp_hdr.ar_hrd = 0x0001;
-	arp_hdr.ar_pro = 0x0800;
+	arp_hdr.ar_hrd = htons(0x0001);
+	arp_hdr.ar_pro = htons(0x0800);
 	arp_hdr.ar_hln = 6;
 	arp_hdr.ar_pln = 4;
 	return arp_hdr;

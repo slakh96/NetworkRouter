@@ -96,7 +96,7 @@ void add_ethernet_headers(struct sr_instance *sr, uint8_t
 	sr_ethernet_hdr_t *casted_packet = (sr_ethernet_hdr_t *)(packet);
 	assert(casted_packet);
 
-	casted_packet->ether_type = ethertype_ip;
+	casted_packet->ether_type = htons(ethertype_ip);
 	memcpy(casted_packet->ether_dhost, (uint8_t*)mac, 6);
 
 	/* Find the src address from the outgoing interface */
@@ -127,9 +127,9 @@ uint8_t ip_dst, unsigned int len){
 	ip_hdr->ip_v = 0x04;
 	ip_hdr->ip_hl = 0x05; /*TODO Check that this is the right value */
 	ip_hdr->ip_tos = 0x00;
-	ip_hdr->ip_len = len; /*Length, including data e.g. ICMP hdr if present*/
-	ip_hdr->ip_id = 0x00; /*TODO: Figure this out*/
-	ip_hdr->ip_off = 0x00; /*TODO: Check if this is correct*/
+	ip_hdr->ip_len = htons(len); /*Length, including data e.g. ICMP hdr if present*/
+	ip_hdr->ip_id = htons(0x00); /*TODO: Figure this out*/
+	ip_hdr->ip_off = htons(0x00); /*TODO: Check if this is correct*/
 	ip_hdr->ip_ttl = 64;
 	ip_hdr->ip_p = 0x00;
 	ip_hdr->ip_src = ip_src;
