@@ -230,7 +230,7 @@ void handle_ip_packet_to_be_sent_out(struct sr_instance *sr, uint8_t
 	ip_packet->ip_dst);
 	if (best_match == NULL) {
 		/*TODO: Send error message if no best match found*/
-		printf("No best match found\n");
+		fprintf(stderr, "No best match found\n");
 		return;
 	}
 
@@ -307,7 +307,7 @@ uint8_t code, unsigned int len){
   icmp3_hdr->icmp_code = code;
 	icmp3_hdr->unused = 0x00;
 	icmp3_hdr->next_mtu = 0x00;
-  icmp3_hdr->icmp_sum = cksum(packet, sizeof(struct sr_icmp_hdr));
+  icmp3_hdr->icmp_sum = cksum(packet, sizeof(struct sr_icmp_t3_hdr));
   return;
 }
 
@@ -327,6 +327,7 @@ void sr_prep_and_send_icmp3_reply(struct sr_instance *sr,
 uint8_t *packet, unsigned int len, char *interface, uint32_t ip_src,
 uint32_t ip_dst, uint8_t ether_shost[ETHER_ADDR_LEN], uint8_t 
 ether_dhost[ETHER_ADDR_LEN], uint8_t type, uint8_t code){
+
 	assert(packet);
 	unsigned int min_total_len = sizeof(sr_ethernet_hdr_t) + sizeof(
 	  sr_ip_hdr_t) + sizeof(sr_icmp_t3_hdr_t);
@@ -334,6 +335,7 @@ ether_dhost[ETHER_ADDR_LEN], uint8_t type, uint8_t code){
 		sr_ip_hdr_t);
 	unsigned int ip_offset = sizeof(sr_ethernet_hdr_t);
 	assert(len >= min_total_len); 
+	
 	add_icmp3_headers(sr, packet + icmp3_offset, type, code,
 		len - icmp3_offset);
 	add_ip_headers(sr, packet + ip_offset, ip_src, ip_dst, len - ip_offset);
