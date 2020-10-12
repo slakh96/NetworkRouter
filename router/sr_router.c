@@ -306,7 +306,9 @@ unsigned int len, char *interface){
 * be an IP packet. The packet buffer should only contain the IP portion,
 * the ethernet part should be trimmed off. The packet length, and the 
 * name of the receiving interface should also be passed in, along with
-* the object representing the router sr_instance.
+* the object representing the router sr_instance. The packet with ethernet
+* must also be passed in, as ICMP reply needs it to find the destination
+* MAC address.
 *
 * Note: The packet and name of the receiving interface's memory are 
 * handled in sr_vns_comm.c so they are not freed here/
@@ -314,7 +316,7 @@ unsigned int len, char *interface){
 *----------------------------------------------------------------------*/
 
 void process_ip_packet(struct sr_instance *sr, uint8_t *packet, unsigned
-int len, char *interface){
+int len, char *interface, uint8_t* packet_with_ethernet){
 
 	printf("Arrived in process_ip_packet function");
 	assert(sr);
@@ -336,7 +338,7 @@ int len, char *interface){
 		printf("Found a packet addressed to this router\n");
 		/* TODO: Handle packets addressed to this router */
 		if (ip_packet->ip_p == ip_protocol_icmp) {
-			sr_handle_icmp_request(sr, packet, len, interface);
+			sr_handle_icmp_request(sr, packet_with_ethernet, len, interface);
 		}
 		else if (ip_packet->ip_p == 0x0006 || ip_packet->ip_p == 0x0011){
 			printf("Found TCP or UDP packet addressed to us\n");
@@ -397,7 +399,8 @@ void sr_handlepacket(struct sr_instance* sr,
 		else {
 			/*TODO: Handle IP packet here*/
 			printf("IP packet has sufficient length \n");
-			process_ip_packet(sr, packet + sizeof(sr_ethernet_hdr_t), len - sizeof(sr_ethernet_hdr_t), interface);
+			process_ip_packet(sr, packet + sizeof(sr_ethernet_hdr_t), 
+				len - sizeof(sr_ethernet_hdr_t), interface, packet);
 		}
 	}
 	else if (ethtype == ethertype_arp) {
