@@ -327,9 +327,12 @@ unsigned int len, char *interface){
 	}
 	if (icmp_packet->icmp_type == 0x08 && icmp_packet->icmp_code == 0x00) {
 		/*Echo request*/
-		sr_prep_and_send_icmp_reply(sr, packet, len, interface, ip_header->ip_dst,
-			ip_header->ip_src, ethernet_header->ether_dhost, 
+		uint8_t *new_packet = (uint8_t*)malloc(icmp_offset + sizeof(sr_icmp_hdr_t));
+		assert(new_packet);
+		sr_prep_and_send_icmp_reply(sr, new_packet, len, interface, 
+			ip_header->ip_dst,ip_header->ip_src, ethernet_header->ether_dhost, 
 			ethernet_header->ether_shost);
+		free(new_packet);
 	}
 
 
