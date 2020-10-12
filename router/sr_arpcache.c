@@ -57,6 +57,7 @@ uint32_t ar_tip, unsigned char ar_sha[6], unsigned char ar_tha[6]){
 
 	struct sr_arp_hdr created_arp_hdr = create_arp_hdr(ar_op,
 		ar_sip, ar_tip, ar_sha, ar_tha);
+	
 	/*Add the arp part to the request which already has ethernet headers*/
 	memcpy(packet_with_ethernet + sizeof(sr_ethernet_hdr_t), &created_arp_hdr, 
 		sizeof(struct sr_arp_hdr));
@@ -79,7 +80,11 @@ uint32_t ar_tip, unsigned char ar_sha[6], unsigned char ar_tha[6]){
 	destroys the ARP request. Takes in the ARP request pointer, and router ptr.
 */
 void sr_handle_arpreq(struct sr_instance *sr, struct sr_arpreq *arp_req) {
+	
+	assert(sr);
+	assert(arp_req);
 	time_t cur_time = time(NULL); /*Gives the time since Jan 1 1970 in seconds*/
+
 	if (cur_time - arp_req->sent >= 1){ /*If haven't sent in past second*/
 		if (arp_req->times_sent >= 5){
 			/*TODO send unreachable ICMP messages to each packet in queue */
@@ -87,17 +92,20 @@ void sr_handle_arpreq(struct sr_instance *sr, struct sr_arpreq *arp_req) {
 			return;
 		}
 		else {
-			assert(arp_req->packets);
-			/*The interface comes from the interface of the first packet*/
+			assert(arp_req->packets);/*TODO: Ensure that this is a correct assertion to make*/
+
 			unsigned char broadcast_mac[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
 			struct sr_if *outgoing_interface = sr_get_interface(sr, arp_req->packets->iface);
 			if (outgoing_interface == 0) {
-				printf("An error occurred; outgoing interface not found");
+				fprintf(stderr, "An error occurred; outgoing interface not found\n");
 				/*TODO: Figure out how to handle this*/
 				return;
 			}
+
+			/*The sender ip comes from the interface of the first packet*/
 			uint32_t sender_ip = outgoing_interface->ip;
 			uint32_t receiving_ip = arp_req->ip;
+
 			sr_prep_and_send_arpreq(sr, arp_req->packets->iface,
 				arp_hrd_ethernet, sender_ip, receiving_ip, outgoing_interface->addr, 
 				broadcast_mac);
@@ -105,7 +113,6 @@ void sr_handle_arpreq(struct sr_instance *sr, struct sr_arpreq *arp_req) {
 			arp_req->times_sent++;
 		}
 	}
-
 }
 
 /*
@@ -225,7 +232,9 @@ int len, char *interface){
   See the comments in the header file for an idea of what it should look like.
 */
 void sr_arpcache_sweepreqs(struct sr_instance *sr) { 
-    struct sr_arpreq *cur_req = sr->cache.requests;
+    assert(sr);
+
+	  struct sr_arpreq *cur_req = sr->cache.requests;
 		struct sr_arpreq *next_req = NULL;
 		while (cur_req != NULL){
 			next_req = cur_req->next;

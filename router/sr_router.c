@@ -243,6 +243,7 @@ void handle_ip_packet_to_be_sent_out(struct sr_instance *sr, uint8_t
 			(uint8_t*)malloc(len + sizeof(sr_ethernet_hdr_t));
 		assert(packet_with_ethernet);
 		unsigned char broadcast_mac[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+		
 		add_ethernet_headers(sr, packet_with_ethernet, interface,
 		broadcast_mac);
 		
@@ -253,10 +254,11 @@ void handle_ip_packet_to_be_sent_out(struct sr_instance *sr, uint8_t
 		struct sr_arpreq *arp_req = sr_arpcache_queuereq(&(sr->cache),
 			ip_packet->ip_dst, packet_with_ethernet, len + sizeof(sr_ethernet_hdr_t),
 			interface);
+		
 		free(packet_with_ethernet);
 		if (arp_req == NULL){
-			printf("Error occurred; the arp_req returned from starter code was\
-			NULL....");
+			fprintf(stderr, "Error occurred; the arp_req returned from\
+			starter code was NULL....\n");
 			/*TODO Figure out if we need to handle this case */
 			return;
 		}
@@ -576,8 +578,9 @@ void sr_handlepacket(struct sr_instance* sr,
 		}
 		else {
 			printf("ARP packet has sufficient length \n");
-			sr_handle_arp_packet(sr, packet +sizeof(sr_arp_hdr_t), 
-			len - sizeof(sr_ethernet_hdr_t), interface);
+			sr_handle_arp_packet(sr, packet +\
+				sizeof(sr_ethernet_hdr_t), len -\
+				sizeof(sr_ethernet_hdr_t), interface);
 			return;
 		}
 	}
