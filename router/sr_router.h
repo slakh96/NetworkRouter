@@ -71,6 +71,10 @@ int sr_read_from_server(struct sr_instance* );
 /* -- sr_router.c -- */
 void sr_init(struct sr_instance* );
 void sr_handlepacket(struct sr_instance* , uint8_t * , unsigned int , char* );
+void sr_prep_and_send_icmp3_reply(struct sr_instance *sr,
+	uint8_t *packet, unsigned int len, char *interface, uint32_t ip_src,
+	uint32_t ip_dst, uint8_t ether_shost[ETHER_ADDR_LEN], uint8_t
+	ether_dhost[ETHER_ADDR_LEN], uint8_t type, uint8_t code);
 
 /* -- sr_if.c -- */
 void sr_add_interface(struct sr_instance* , const char* );

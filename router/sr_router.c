@@ -103,7 +103,7 @@ void add_ethernet_headers(struct sr_instance *sr, uint8_t
 	struct sr_if *outgoing_interface = sr_get_interface(sr, interface);
 	if (outgoing_interface == 0) {
 		fprintf(stderr, "An error occurred; outgoing interface not found\n");
-		/*TODO: Figure out how to handle this*/
+		/*TODO: Figure out if we have to handle this*/
 		return;
 	}
 	memcpy(casted_packet->ether_shost, (uint8_t*)outgoing_interface->addr, 6);
@@ -204,11 +204,15 @@ uint8_t *prepare_to_send_ip_req(struct sr_instance *sr, uint8_t
 *---------------------------------------------------------------------*/
 
 void handle_ip_packet_to_be_sent_out(struct sr_instance *sr, uint8_t 
-*packet, unsigned int len, char *interface){
+*packet, unsigned int len, char *interface, uint8_t *packet_with_ethernet){
 	printf("Reached the handle_ip_packet_to_be_sent_out fn\n");
 	assert(sr);
 	assert(packet);
 	assert(interface);
+	assert(len >= sizeof(sr_ip_hdr_t));
+	sr_ethernet_hdr_t *ethernet_packet =\
+		(sr_ethernet_hdr_t*)packet_with_ethernet;
+	assert(packet_with_ethernet);
 	sr_ip_hdr_t *ip_packet = (sr_ip_hdr_t*)(packet);
 	assert(ip_packet);
 
@@ -217,6 +221,14 @@ void handle_ip_packet_to_be_sent_out(struct sr_instance *sr, uint8_t
 	if (ip_packet->ip_ttl <= 0) {
 		fprintf(stderr, "This packet has a TTL of 0; cannot send it\n");
 		/* TODO: Handle this error checking */
+		uint8_t *empty_packet = (uint8_t*)malloc(len +sizeof(sr_ethernet_hdr_t));
+		assert(empty_packet);
+		sr_prep_and_send_icmp3_reply(sr, empty_packet, len + 
+			sizeof(sr_ethernet_hdr_t), 
+			interface, ip_packet->ip_dst, ip_packet->ip_src,
+			ethernet_packet->ether_dhost, ethernet_packet->ether_shost,
+			0x11, 0x00);
+		free(empty_packet);
 		return;
 	}
 
@@ -292,13 +304,15 @@ void handle_ip_packet_to_be_sent_out(struct sr_instance *sr, uint8_t
 * uint8_t code, unsigned int len);
 *
 * This function takes a preallocated packet with length len, a router instance,
-* and source/destination type/code information and fills the packet with info
-* related to the icmp3 header. Also recalculates the icmp3 checksum.
+* and source/destination type/code information. It also takes the IP packet. It
+* fills the preallocated packet with info related to the icmp3 header, with
+* the data field being filled with part of the IP packet. Also recalculates 
+* the icmp3 checksum.
 *
 *---------------------------------------------------------------------------*/
  
 void add_icmp3_headers(struct sr_instance *sr, uint8_t *packet, uint8_t type,
-uint8_t code, unsigned int len){
+uint8_t code, unsigned int len, uint8_t *ip_packet){
   assert(len >= sizeof(struct sr_icmp_t3_hdr));
   struct sr_icmp_t3_hdr *icmp3_hdr = (struct sr_icmp_t3_hdr*)packet;
   assert(icmp3_hdr);
@@ -307,6 +321,7 @@ uint8_t code, unsigned int len){
   icmp3_hdr->icmp_code = code;
 	icmp3_hdr->unused = 0x00;
 	icmp3_hdr->next_mtu = 0x00;
+	memcpy(icmp3_hdr->data, ip_packet, ICMP_DATA_SIZE);
   icmp3_hdr->icmp_sum = cksum(packet, sizeof(struct sr_icmp_t3_hdr));
   return;
 }
@@ -337,7 +352,7 @@ ether_dhost[ETHER_ADDR_LEN], uint8_t type, uint8_t code){
 	assert(len >= min_total_len); 
 	
 	add_icmp3_headers(sr, packet + icmp3_offset, type, code,
-		len - icmp3_offset);
+		len - icmp3_offset, packet + ip_offset);
 	add_ip_headers(sr, packet + ip_offset, ip_src, ip_dst, len - ip_offset);
 	add_ethernet_headers(sr, packet, interface, ether_dhost);
 	sr_ethernet_hdr_t *ethernet_packet = (sr_ethernet_hdr_t*)packet;
@@ -506,7 +521,8 @@ int len, char *interface, uint8_t* packet_with_ethernet){
 
 	/* If the code reaches here, it is not addressed to this router */
 	printf("This packet is not addressed to us, try to forward it\n");
-	handle_ip_packet_to_be_sent_out(sr, packet, len, interface);	
+	handle_ip_packet_to_be_sent_out(sr, packet, len, interface,
+		packet_with_ethernet);	
 }
 
 /*---------------------------------------------------------------------
