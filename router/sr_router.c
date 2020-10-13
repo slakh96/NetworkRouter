@@ -246,7 +246,6 @@ void handle_ip_packet_to_be_sent_out(struct sr_instance *sr, uint8_t
 	struct sr_rt *best_match = find_longest_prefix_match(sr->routing_table,
 	ip_packet->ip_dst);
 	if (best_match == NULL) {
-		/*TODO: Send error message if no best match found*/
 		fprintf(stderr, "No best match found\n");
 		struct sr_if *outgoing_interface = sr_get_interface(sr, interface);
 		if (outgoing_interface == NULL){
@@ -338,6 +337,7 @@ uint8_t code, unsigned int len, uint8_t *ip_packet){
 	icmp3_hdr->unused = 0x00;
 	icmp3_hdr->next_mtu = 0x00;
 	memcpy(icmp3_hdr->data, ip_packet, ICMP_DATA_SIZE);
+	icmp3_hdr->icmp_sum  = 0;
   icmp3_hdr->icmp_sum = cksum(packet, sizeof(struct sr_icmp_t3_hdr));
   return;
 }

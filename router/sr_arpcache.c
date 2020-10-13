@@ -96,7 +96,6 @@ void sr_handle_arpreq(struct sr_instance *sr, struct sr_arpreq *arp_req) {
 		}
 
 		if (arp_req->times_sent >= 5){
-			/*TODO send unreachable ICMP messages to each packet in queue */
 			struct sr_packet *cur_packet = arp_req->packets;
 			while (cur_packet != NULL){
 				sr_ethernet_hdr_t *ethernet_packet = (sr_ethernet_hdr_t*)cur_packet->buf;
