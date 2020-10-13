@@ -43,7 +43,8 @@ uint32_t ar_tip, unsigned char ar_sha[6], unsigned char ar_tha[6]){
 */
 void sr_prep_and_send_arpreq(struct sr_instance *sr, char *interface,
 unsigned short ar_op, uint32_t ar_sip,
-uint32_t ar_tip, unsigned char ar_sha[6], unsigned char ar_tha[6]){
+uint32_t ar_tip, unsigned char ar_sha[6], unsigned char ar_tha[6],
+unsigned short outgoing_opcode){
 
 	printf("Reached sr_prep_and_send_arpreq\n");
 	assert(sr);
@@ -58,7 +59,7 @@ uint32_t ar_tip, unsigned char ar_sha[6], unsigned char ar_tha[6]){
 	sr_ethernet_hdr_t* eth_pkt = (sr_ethernet_hdr_t*)packet_with_ethernet;
 	eth_pkt->ether_type = htons(ethertype_arp);
 
-	struct sr_arp_hdr created_arp_hdr = create_arp_hdr(ar_op,
+	struct sr_arp_hdr created_arp_hdr = create_arp_hdr(outgoing_opcode,
 		ar_sip, ar_tip, ar_sha, ar_tha);
 	/*Add the arp part to the request which already has ethernet headers*/
 	memcpy(packet_with_ethernet + sizeof(sr_ethernet_hdr_t), &created_arp_hdr, 
@@ -135,7 +136,7 @@ void sr_handle_arpreq(struct sr_instance *sr, struct sr_arpreq *arp_req) {
 
 			sr_prep_and_send_arpreq(sr, arp_req->packets->iface,
 				arp_hrd_ethernet, sender_ip, receiving_ip, outgoing_interface->addr, 
-				broadcast_mac);
+				broadcast_mac, arp_op_request);
 			arp_req->sent = time(NULL); /*Recompute cur time, to be more accurate*/
 			arp_req->times_sent++;
 		}
@@ -238,7 +239,7 @@ int len, char *interface){
 		uint32_t src_ip = addressed_interface->ip;
 		
 		sr_prep_and_send_arpreq(sr, interface, arp_hrd_ethernet, src_ip, 
-			dst_ip, addressed_interface->addr, arp_header->ar_sha);
+			dst_ip, addressed_interface->addr, arp_header->ar_sha, arp_op_reply);
 	
 	}
 	else if (ntohs(arp_header->ar_op) == arp_op_reply) {

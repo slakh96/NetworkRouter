@@ -497,13 +497,18 @@ int len, char *interface, uint8_t* packet_with_ethernet){
 	assert(ip_packet);
 	
 	/*Verification of checksum*/
+	uint16_t cur_checksum = ip_packet->ip_sum;
+	ip_packet->ip_sum = 0; /*Zero out checksum so incoming checksum does not 
+	affect the calculation */
 	uint16_t calculated_checksum = cksum(packet, sizeof(sr_ip_hdr_t));
-	if (calculated_checksum != ip_packet->ip_sum) {
+	if (calculated_checksum != cur_checksum) {
 		fprintf(stderr, "The IP checksum did not match: calculated_checksum is %u\
-		and given checksum is %u\n", calculated_checksum, ip_packet->ip_sum);
+		and given checksum is %u\n", calculated_checksum, cur_checksum);
 		return;
 	}
-	
+	ip_packet->ip_sum = cur_checksum; /*Put it back to normal in case it needs to 
+	be checked later*/
+
 	/* Check if packet is addressed to us */
 	struct sr_if *addressed_interface =\
 	find_addressed_interface(sr, ip_packet->ip_dst);
@@ -573,7 +578,7 @@ void sr_handlepacket(struct sr_instance* sr,
   assert(packet);
   assert(interface);
 
-  printf("*** -> Received packet of length %d \n",len);
+  printf("*********************** -> Received packet of length %d \n",len);
   printf("REACHED sr_handlepacket\n");
   print_hdr_eth(packet);
 	print_hdrs(packet, len);

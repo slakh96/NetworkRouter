@@ -152,7 +152,8 @@ struct sr_if *find_addressed_interface(struct sr_instance *sr, uint32_t ip);
 /*Prepares and sends an arp request*/
 void sr_prep_and_send_arpreq(struct sr_instance *sr, char *interface,
 unsigned short ar_op, uint32_t ar_sip,
-uint32_t ar_tip, unsigned char ar_sha[6], unsigned char ar_tha[6]);
+uint32_t ar_tip, unsigned char ar_sha[6], unsigned char ar_tha[6],
+unsigned short outgoing_opcode);
 
 /* You shouldn't have to call these methods--they're already called in the
    starter code for you. The init call is a constructor, the destroy call is
