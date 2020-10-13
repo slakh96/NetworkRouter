@@ -11,6 +11,7 @@
 #include "sr_router.h"
 #include "sr_if.h"
 #include "sr_protocol.h"
+#include "sr_utils.h"
 
 /*
 	This function creates and returns a sr_arp_hdr given some information
@@ -54,15 +55,19 @@ uint32_t ar_tip, unsigned char ar_sha[6], unsigned char ar_tha[6]){
 	assert(packet_with_ethernet);
 	
 	add_ethernet_headers(sr, packet_with_ethernet, interface, ar_tha);
+	sr_ethernet_hdr_t* eth_pkt = (sr_ethernet_hdr_t*)packet_with_ethernet;
+	eth_pkt->ether_type = htons(ethertype_arp);
 
 	struct sr_arp_hdr created_arp_hdr = create_arp_hdr(ar_op,
 		ar_sip, ar_tip, ar_sha, ar_tha);
-	
 	/*Add the arp part to the request which already has ethernet headers*/
 	memcpy(packet_with_ethernet + sizeof(sr_ethernet_hdr_t), &created_arp_hdr, 
 		sizeof(struct sr_arp_hdr));
+	/*printf("Printing all headers of the packet to send out:\n");
+	print_hdrs(packet_with_ethernet, eth_pkt_size);*/
 	int status = sr_send_packet(sr, packet_with_ethernet, eth_pkt_size,
 		interface);
+	printf("Sent packet\n");
 	if (status != 0){
 		fprintf(stderr, "Error when sending ARP req\n");
 		free(packet_with_ethernet);
@@ -172,6 +177,7 @@ unsigned int len, char *interface){
 	struct sr_arpreq *arpreq = sr_arpcache_insert(&(sr->cache), 
 	arp_header->ar_sha, arp_header->ar_sip);
 	if (arpreq == NULL){
+		printf("No one is waiting on this packet\n");
 		return; /*No packets were waiting on this mapping*/
 	}
 
@@ -216,7 +222,7 @@ int len, char *interface){
 	assert(len >= sizeof(sr_arp_hdr_t));
 	sr_arp_hdr_t *arp_header = (sr_arp_hdr_t*)packet;
 	assert(arp_header);
-
+	print_hdr_arp(packet);
 	/*Determine if ARP packet is addressed to us */
 	struct sr_if *addressed_interface =\
 		find_addressed_interface(sr, arp_header->ar_tip);
@@ -224,7 +230,7 @@ int len, char *interface){
 		printf("This ARP packet is not addressed to us; ignore\n");
 		return;
 	}
-	if (arp_header->ar_op == arp_op_request){
+	if (ntohs(arp_header->ar_op) == arp_op_request){
 		/*The sender needs a MAC addr from us*/
 
 		/*Reverse the send and receiving addresses to send back*/
@@ -235,7 +241,7 @@ int len, char *interface){
 			dst_ip, addressed_interface->addr, arp_header->ar_sha);
 	
 	}
-	else if (arp_header->ar_op == arp_op_reply) {
+	else if (ntohs(arp_header->ar_op) == arp_op_reply) {
 		/*The sender is replying to our arp request*/
 		sr_handle_arp_reply(sr, arp_header, len, interface);
 	}
