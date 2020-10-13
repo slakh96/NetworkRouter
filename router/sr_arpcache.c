@@ -86,22 +86,45 @@ void sr_handle_arpreq(struct sr_instance *sr, struct sr_arpreq *arp_req) {
 	time_t cur_time = time(NULL); /*Gives the time since Jan 1 1970 in seconds*/
 
 	if (cur_time - arp_req->sent >= 1){ /*If haven't sent in past second*/
+		assert(arp_req->packets);/*TODO: Ensure that this is a correct assertion to make*/
+		       
+		unsigned char broadcast_mac[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+		struct sr_if *outgoing_interface = sr_get_interface(sr, arp_req->packets->iface);
+		if (outgoing_interface == 0) {
+			fprintf(stderr, "An error occurred; outgoing interface not found\n");
+			return;
+		}
+
 		if (arp_req->times_sent >= 5){
 			/*TODO send unreachable ICMP messages to each packet in queue */
+			struct sr_packet *cur_packet = arp_req->packets;
+			while (cur_packet != NULL){
+				sr_ethernet_hdr_t *ethernet_packet = (sr_ethernet_hdr_t*)cur_packet->buf;
+				assert(ethernet_packet);
+				sr_ip_hdr_t *ip_header = (sr_ip_hdr_t*)(cur_packet->buf +\
+					sizeof(sr_ethernet_hdr_t));
+				assert(ip_header);
+
+				int total_size = sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t) +
+					sizeof(sr_icmp_t3_hdr_t);
+				uint8_t *new_packet = (uint8_t*)malloc(total_size);
+				assert(new_packet);
+				
+				struct sr_if *outgoing_interface = sr_get_interface(sr, cur_packet->iface);
+				if (outgoing_interface == NULL){
+					fprintf(stderr, "Error getting outgoing interface when sending ARP req\n");
+					return;
+				}
+
+				sr_prep_and_send_icmp3_reply(sr, new_packet, total_size, cur_packet->iface,
+					outgoing_interface->ip, ip_header->ip_dst, outgoing_interface->addr, 
+					ethernet_packet->ether_shost, 3, 1);
+				cur_packet = cur_packet->next;
+			}
 			sr_arpreq_destroy(&(sr->cache), arp_req);
 			return;
 		}
 		else {
-			assert(arp_req->packets);/*TODO: Ensure that this is a correct assertion to make*/
-
-			unsigned char broadcast_mac[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
-			struct sr_if *outgoing_interface = sr_get_interface(sr, arp_req->packets->iface);
-			if (outgoing_interface == 0) {
-				fprintf(stderr, "An error occurred; outgoing interface not found\n");
-				/*TODO: Figure out how to handle this*/
-				return;
-			}
-
 			/*The sender ip comes from the interface of the first packet*/
 			uint32_t sender_ip = outgoing_interface->ip;
 			uint32_t receiving_ip = arp_req->ip;
