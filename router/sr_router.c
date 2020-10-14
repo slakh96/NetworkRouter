@@ -66,7 +66,8 @@ void sr_init(struct sr_instance* sr)
 
 struct sr_rt *find_longest_prefix_match(struct sr_rt *routing_table, 
 uint32_t ip_dst) {
-	printf("Reached find longest prefix match fn, to be implemented");
+	printf("Reached find longest prefix match fn, to be implemented\n");
+	printf("The ip_dst is %u\n", ip_dst);
 	/* TODO: Implement this */
 	if (routing_table != NULL) {
 		uint32_t entry_ip = routing_table->mask.s_addr;
