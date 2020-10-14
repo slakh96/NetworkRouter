@@ -198,6 +198,7 @@ unsigned int len, char *interface){
 		cur_packet = cur_packet->next;
 	}
 	/*Delete the ARP request once all of the packets have been sent */
+	printf("Sent all of the packets, deleting the ARP request\n");
 	sr_arpreq_destroy(&(sr->cache), arpreq);
 
 }

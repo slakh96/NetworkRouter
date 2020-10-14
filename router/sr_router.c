@@ -52,7 +52,7 @@ void sr_init(struct sr_instance* sr)
 } /* -- sr_init -- */
 
 /*---------------------------------------------------------------------
-* Method: find_longest_prefix_match(struct sr_rt *routing_table, 
+* Method: find_longest_prefix_match(struct sr_instance *sr, 
 * uint32_t ip_dst)
 * Scope: Global
 *
@@ -64,16 +64,40 @@ void sr_init(struct sr_instance* sr)
 *
 *---------------------------------------------------------------------*/
 
-struct sr_rt *find_longest_prefix_match(struct sr_rt *routing_table, 
+struct sr_rt *find_longest_prefix_match(struct sr_instance *sr, 
 uint32_t ip_dst) {
 	printf("Reached find longest prefix match fn, to be implemented\n");
 	printf("The ip_dst is %u\n", ip_dst);
+	sr_print_routing_table(sr);
 	/* TODO: Implement this */
-	if (routing_table != NULL) {
-		uint32_t entry_ip = routing_table->mask.s_addr;
-		printf("The entry_ip is %u\n", entry_ip);
+	struct sr_rt* cur_routing_entry = sr->routing_table;
+	struct sr_rt *longest_match = NULL;
+	while (cur_routing_entry != NULL) {
+		/*uint32_t entry_ip = cur_routing_entry->mask.s_addr;*/
+		/*printf("The entry_mask is %u\n", cur_routing_entry->mask.s_addr);
+		printf("The entry destination is %u\n", cur_routing_entry->dest.s_addr);*/
+
+		uint32_t ip_dst_mask = ip_dst & cur_routing_entry->mask.s_addr;
+		if (ip_dst_mask == (cur_routing_entry->mask.s_addr & 
+			cur_routing_entry->dest.s_addr)){
+			/*Match found*/
+			printf("Match found\n");
+			if (longest_match == NULL || cur_routing_entry->mask.s_addr > 
+				longest_match->mask.s_addr){
+					longest_match = cur_routing_entry;
+				}
+		}
+
+		cur_routing_entry = cur_routing_entry->next;
 	}
-	return routing_table;
+	if (longest_match){
+		printf("The best match is:\n");
+		sr_print_routing_entry(longest_match);
+	}
+	else {
+		printf("No longest prefix match found\n");
+	}
+	return longest_match;
 }
 
 /*---------------------------------------------------------------------
@@ -244,7 +268,7 @@ void handle_ip_packet_to_be_sent_out(struct sr_instance *sr, uint8_t
 	/*TODO: make sure checksum is updated in packet as well as ip_packet*/
 	
 	/*Find best-match IP address for this packet*/
-	struct sr_rt *best_match = find_longest_prefix_match(sr->routing_table,
+	struct sr_rt *best_match = find_longest_prefix_match(sr,
 	ip_packet->ip_dst);
 	if (best_match == NULL) {
 		fprintf(stderr, "No best match found\n");
@@ -265,7 +289,7 @@ void handle_ip_packet_to_be_sent_out(struct sr_instance *sr, uint8_t
 
 	/* Check ARP cache for MAC address corresponding to the next-hop IP*/
 	struct sr_arpentry *arp_cache_entry = sr_arpcache_lookup(&(sr->cache), 
-	ip_packet->ip_dst);
+	best_match->dest.s_addr);/**/
 
 	if (arp_cache_entry == NULL) { /* No MAC addr found; make ARP req */
 		uint8_t *packet_with_ethernet = \
@@ -273,23 +297,25 @@ void handle_ip_packet_to_be_sent_out(struct sr_instance *sr, uint8_t
 		assert(packet_with_ethernet);
 		unsigned char broadcast_mac[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
 		
-		add_ethernet_headers(sr, packet_with_ethernet, interface,
-		broadcast_mac);
+		add_ethernet_headers(sr, packet_with_ethernet,
+			best_match->interface,
+			broadcast_mac);
 		
 		/*Add the IP part to the end of the packet*/
 		memcpy(packet_with_ethernet + sizeof(sr_ethernet_hdr_t), packet, len);
 		
 		/*Add this request to the arpcache queued requests*/
 		struct sr_arpreq *arp_req = sr_arpcache_queuereq(&(sr->cache),
-			ip_packet->ip_dst, packet_with_ethernet, len + sizeof(sr_ethernet_hdr_t),
-			interface);
+			best_match->dest.s_addr, packet_with_ethernet, len + sizeof(sr_ethernet_hdr_t),
+			best_match->interface);/**/
 		
-		free(packet_with_ethernet);
+		/*free(packet_with_ethernet);*/
 		if (arp_req == NULL){
 			fprintf(stderr, "Error occurred; the arp_req returned from\
 			starter code was NULL....\n");
 			return;
 		}
+		printf("Handling the new ARP request now\n");
 		/*Send out request for the MAC address*/
 		sr_handle_arpreq(sr, arp_req);
 	}
