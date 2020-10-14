@@ -66,16 +66,12 @@ void sr_init(struct sr_instance* sr)
 
 struct sr_rt *find_longest_prefix_match(struct sr_instance *sr, 
 uint32_t ip_dst) {
-	printf("Reached find longest prefix match fn, to be implemented\n");
-	printf("The ip_dst is %u\n", ip_dst);
+	printf("Reached find longest prefix match fn\n");
 	sr_print_routing_table(sr);
 	/* TODO: Implement this */
 	struct sr_rt* cur_routing_entry = sr->routing_table;
 	struct sr_rt *longest_match = NULL;
 	while (cur_routing_entry != NULL) {
-		/*uint32_t entry_ip = cur_routing_entry->mask.s_addr;*/
-		/*printf("The entry_mask is %u\n", cur_routing_entry->mask.s_addr);
-		printf("The entry destination is %u\n", cur_routing_entry->dest.s_addr);*/
 
 		uint32_t ip_dst_mask = ip_dst & cur_routing_entry->mask.s_addr;
 		if (ip_dst_mask == (cur_routing_entry->mask.s_addr & 
@@ -337,6 +333,9 @@ void handle_ip_packet_to_be_sent_out(struct sr_instance *sr, uint8_t
 		if (status != 0){
 			printf("An error occurred when sending packet! Status %d\n", status);
 		}
+		else {
+			printf("IP Packet sent out\n");
+		}
 		free(new_packet);
 	}
 }
@@ -515,7 +514,7 @@ unsigned int len, char *interface){
 void process_ip_packet(struct sr_instance *sr, uint8_t *packet, unsigned
 int len, char *interface, uint8_t* packet_with_ethernet){
 
-	printf("Arrived in process_ip_packet function");
+	printf("Arrived in process_ip_packet function\n");
 	assert(sr);
 	assert(packet);
 	assert(interface);
@@ -607,8 +606,8 @@ void sr_handlepacket(struct sr_instance* sr,
 
   printf("*********************** -> Received packet of length %d \n",len);
   printf("REACHED sr_handlepacket\n");
-  print_hdr_eth(packet);
-	print_hdrs(packet, len);
+  /*print_hdr_eth(packet);
+	print_hdrs(packet, len);*/
   /* fill in code here */
 	/*printf("The routing table entries are the following: \n");
 	sr_print_routing_table(sr);*/

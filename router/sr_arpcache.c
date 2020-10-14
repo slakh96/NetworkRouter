@@ -68,7 +68,7 @@ unsigned short outgoing_opcode){
 	print_hdrs(packet_with_ethernet, eth_pkt_size);*/
 	int status = sr_send_packet(sr, packet_with_ethernet, eth_pkt_size,
 		interface);
-	printf("Sent packet\n");
+	printf("Sent ARP packet\n");
 	if (status != 0){
 		fprintf(stderr, "Error when sending ARP req\n");
 		free(packet_with_ethernet);
@@ -224,7 +224,7 @@ int len, char *interface){
 	assert(len >= sizeof(sr_arp_hdr_t));
 	sr_arp_hdr_t *arp_header = (sr_arp_hdr_t*)packet;
 	assert(arp_header);
-	print_hdr_arp(packet);
+	/*print_hdr_arp(packet);*/
 	/*Determine if ARP packet is addressed to us */
 	struct sr_if *addressed_interface =\
 		find_addressed_interface(sr, arp_header->ar_tip);
