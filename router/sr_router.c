@@ -75,7 +75,7 @@ uint32_t ip_dst) {
 
 		uint32_t ip_dst_mask = ip_dst & cur_routing_entry->mask.s_addr;
 		if (ip_dst_mask == (cur_routing_entry->mask.s_addr & 
-			cur_routing_entry->dest.s_addr)){
+			cur_routing_entry->gw.s_addr)){
 			/*Match found*/
 			printf("Match found\n");
 			if (longest_match == NULL || cur_routing_entry->mask.s_addr > 
@@ -259,6 +259,8 @@ void handle_ip_packet_to_be_sent_out(struct sr_instance *sr, uint8_t
 	}
 
 	/* Recompute checksum, since the TTL changed */
+	ip_packet->ip_sum = 0; /*Set to 0 so it doesnt affect the real 
+	calculation*/
 	uint16_t calculated_checksum = cksum(packet, sizeof(sr_ip_hdr_t));
 	ip_packet->ip_sum = calculated_checksum;
 	/*TODO: make sure checksum is updated in packet as well as ip_packet*/
@@ -285,7 +287,7 @@ void handle_ip_packet_to_be_sent_out(struct sr_instance *sr, uint8_t
 
 	/* Check ARP cache for MAC address corresponding to the next-hop IP*/
 	struct sr_arpentry *arp_cache_entry = sr_arpcache_lookup(&(sr->cache), 
-	best_match->dest.s_addr);/**/
+	best_match->gw.s_addr);/**/
 
 	if (arp_cache_entry == NULL) { /* No MAC addr found; make ARP req */
 		uint8_t *packet_with_ethernet = \
@@ -302,7 +304,7 @@ void handle_ip_packet_to_be_sent_out(struct sr_instance *sr, uint8_t
 		
 		/*Add this request to the arpcache queued requests*/
 		struct sr_arpreq *arp_req = sr_arpcache_queuereq(&(sr->cache),
-			best_match->dest.s_addr, packet_with_ethernet, len + sizeof(sr_ethernet_hdr_t),
+			best_match->gw.s_addr, packet_with_ethernet, len + sizeof(sr_ethernet_hdr_t),
 			best_match->interface);/**/
 		
 		/*free(packet_with_ethernet);*/
