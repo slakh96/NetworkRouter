@@ -240,6 +240,9 @@ void handle_ip_packet_to_be_sent_out(struct sr_instance *sr, uint8_t
 	ip_packet->ip_ttl -= 1;
 	if (ip_packet->ip_ttl <= 0) {
 		fprintf(stderr, "This packet has a TTL of 0; cannot send it\n");
+		printf("The contents of this packet are the following:\n");
+		print_hdrs(packet_with_ethernet, len + sizeof(sr_ethernet_hdr_t));
+		printf("#############################################################\n");
 		uint8_t *empty_packet = (uint8_t*)malloc(len +sizeof(sr_ethernet_hdr_t));
 		assert(empty_packet);
 		
@@ -249,6 +252,8 @@ void handle_ip_packet_to_be_sent_out(struct sr_instance *sr, uint8_t
 			free(empty_packet);
 			return;
 		}
+		printf("THE IP SRC is\n");
+		print_addr_ip_int(ntohl(ip_packet->ip_src));
 		sr_prep_and_send_icmp3_reply(sr, empty_packet, len + 
 			sizeof(sr_ethernet_hdr_t), 
 			interface, outgoing_interface->ip, ip_packet->ip_src,
@@ -386,7 +391,8 @@ void sr_prep_and_send_icmp3_reply(struct sr_instance *sr,
 uint8_t *packet, unsigned int len, char *interface, uint32_t ip_src,
 uint32_t ip_dst, uint8_t ether_shost[ETHER_ADDR_LEN], uint8_t 
 ether_dhost[ETHER_ADDR_LEN], uint8_t type, uint8_t code){
-
+	
+	printf("Reached the sr_prep_and_send_icmp3_reply fn\n");
 	assert(packet);
 	unsigned int min_total_len = sizeof(sr_ethernet_hdr_t) + sizeof(
 	  sr_ip_hdr_t) + sizeof(sr_icmp_t3_hdr_t);
@@ -394,15 +400,26 @@ ether_dhost[ETHER_ADDR_LEN], uint8_t type, uint8_t code){
 		sr_ip_hdr_t);
 	unsigned int ip_offset = sizeof(sr_ethernet_hdr_t);
 	assert(len >= min_total_len); 
-	
+	printf("THE IP SRC(became ip dst) INSIDE icmp3 reply fn IS\n")	;
+	print_addr_ip_int(ip_dst);
 	add_icmp3_headers(sr, packet + icmp3_offset, type, code,
 		len - icmp3_offset, packet + ip_offset);
 	add_ip_headers(sr, packet + ip_offset, ip_src, ip_dst, len - ip_offset);
+	sr_ip_hdr_t *ip_packet = (sr_ip_hdr_t*)(packet + ip_offset);
+	ip_packet->ip_p = ip_protocol_icmp; /*Make sure this is an icmp
+	packet*/
 	add_ethernet_headers(sr, packet, interface, ether_dhost);
 	sr_ethernet_hdr_t *ethernet_packet = (sr_ethernet_hdr_t*)packet;
 	assert(ethernet_packet);
 	memcpy(ethernet_packet->ether_shost, ether_shost, ETHER_ADDR_LEN);
-  sr_send_packet(sr, packet, len, interface);
+	printf("Sending the following icmp3 packet:\n");
+	print_hdrs(packet, len);
+  int status = sr_send_packet(sr, packet, len, interface);
+	if (status != 0){
+		fprintf(stderr, "Error when sending icmp3 packet\n");
+		return;
+	}
+	printf("Sent icmp3 packet\n");
 	return;
 }
 
