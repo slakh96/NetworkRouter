@@ -75,7 +75,7 @@ uint32_t ip_dst) {
 
 		uint32_t ip_dst_mask = ip_dst & cur_routing_entry->mask.s_addr;
 		if (ip_dst_mask == (cur_routing_entry->mask.s_addr & 
-			cur_routing_entry->gw.s_addr)){
+			cur_routing_entry->dest.s_addr)){
 			/*Match found*/
 			printf("Match found\n");
 			if (longest_match == NULL || cur_routing_entry->mask.s_addr > 
@@ -287,7 +287,7 @@ void handle_ip_packet_to_be_sent_out(struct sr_instance *sr, uint8_t
 
 	/* Check ARP cache for MAC address corresponding to the next-hop IP*/
 	struct sr_arpentry *arp_cache_entry = sr_arpcache_lookup(&(sr->cache), 
-	best_match->gw.s_addr);/**/
+	best_match->dest.s_addr);/**/
 
 	if (arp_cache_entry == NULL) { /* No MAC addr found; make ARP req */
 		uint8_t *packet_with_ethernet = \
