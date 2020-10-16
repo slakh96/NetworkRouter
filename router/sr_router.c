@@ -67,7 +67,7 @@ void sr_init(struct sr_instance* sr)
 struct sr_rt *find_longest_prefix_match(struct sr_instance *sr, 
 uint32_t ip_dst) {
 	printf("Reached find longest prefix match fn\n");
-	sr_print_routing_table(sr);
+	/*sr_print_routing_table(sr);*/
 	/* TODO: Implement this */
 	struct sr_rt* cur_routing_entry = sr->routing_table;
 	struct sr_rt *longest_match = NULL;
@@ -141,6 +141,12 @@ void add_ethernet_headers(struct sr_instance *sr, uint8_t
 
 void add_ip_headers(struct sr_instance *sr, uint8_t *packet, uint8_t ip_src,
 uint8_t ip_dst, unsigned int len){
+	
+	printf("The ip_src in add ip headers is\n");
+  print_addr_ip_int(ntohl(ip_src));
+  printf("The ip_dst in add ip headers is \n");
+  print_addr_ip_int(ntohl(ip_dst));
+	
 	assert(len >= sizeof(sr_ip_hdr_t));
 	sr_ip_hdr_t *ip_hdr = (sr_ip_hdr_t*)packet;
 	assert(ip_hdr);
@@ -156,6 +162,12 @@ uint8_t ip_dst, unsigned int len){
 	ip_hdr->ip_dst = ip_dst;
 	ip_hdr->ip_sum = 0; /*To prevent segfaults from uninitialized memory*/
 	ip_hdr->ip_sum = cksum(packet, sizeof(sr_ip_hdr_t));
+	printf("The ip_src is\n");
+	print_addr_ip_int(ntohl(ip_src));
+	printf("The ip_dst is \n");
+	print_addr_ip_int(ntohl(ip_dst));
+	printf("The ip header which is newly created are>>>>>>>>>>>>>>>>>>>>>>>\n");
+	print_hdr_ip(packet);
 	return;
 
 }
@@ -258,7 +270,7 @@ void handle_ip_packet_to_be_sent_out(struct sr_instance *sr, uint8_t
 			sizeof(sr_ethernet_hdr_t), 
 			interface, outgoing_interface->ip, ip_packet->ip_src,
 			outgoing_interface->addr, ethernet_packet->ether_shost,
-			0x11, 0x00);
+			11, 0);
 		free(empty_packet);
 		return;
 	}
@@ -400,14 +412,30 @@ ether_dhost[ETHER_ADDR_LEN], uint8_t type, uint8_t code){
 		sr_ip_hdr_t);
 	unsigned int ip_offset = sizeof(sr_ethernet_hdr_t);
 	assert(len >= min_total_len); 
-	printf("THE IP SRC(became ip dst) INSIDE icmp3 reply fn IS\n")	;
-	print_addr_ip_int(ip_dst);
+	printf("THE IP SRC(became ip dst) INSIDE icmp3 reply fn IS\n");
+	print_addr_ip_int(ntohl(ip_dst));
+	printf("THE IP DST(became ip_src) INSIDE icmp3 reply fn IS\n");
+	print_addr_ip_int(ntohl(ip_src));
+
+
 	add_icmp3_headers(sr, packet + icmp3_offset, type, code,
 		len - icmp3_offset, packet + ip_offset);
-	add_ip_headers(sr, packet + ip_offset, ip_src, ip_dst, len - ip_offset);
+	add_ip_headers(sr, packet + ip_offset, ip_src, ip_dst, min_total_len - ip_offset);
 	sr_ip_hdr_t *ip_packet = (sr_ip_hdr_t*)(packet + ip_offset);
+
+
+	print_addr_ip_int(ntohl(ip_packet->ip_dst));
 	ip_packet->ip_p = ip_protocol_icmp; /*Make sure this is an icmp
 	packet*/
+	ip_packet->ip_dst = ip_dst;
+	ip_packet->ip_src = ip_src;
+	ip_packet->ip_sum = 0;
+  ip_packet->ip_sum = cksum(packet + ip_offset, ip_packet->ip_len);
+	printf("The IP dst after assigning to the packet is \n");
+  print_addr_ip_int(ntohl(ip_packet->ip_dst));
+
+
+
 	add_ethernet_headers(sr, packet, interface, ether_dhost);
 	sr_ethernet_hdr_t *ethernet_packet = (sr_ethernet_hdr_t*)packet;
 	assert(ethernet_packet);

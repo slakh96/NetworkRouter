@@ -190,9 +190,9 @@ unsigned int len, char *interface){
 
 		/*Set the newly discovered destination MAC address*/
 		memcpy(ethernet_buf->ether_dhost, arp_header->ar_sha, ETHER_ADDR_LEN);
-		printf("Preparing to send out the following queued IP packet\n");
+		/*printf("Preparing to send out the following queued IP packet\n");
 		print_hdrs(cur_packet->buf, cur_packet->len);
-		printf("printed=====================================================\n");
+		printf("printed=====================================================\n");*/
 		int status = sr_send_packet(sr, cur_packet->buf, cur_packet->len,
 			cur_packet->iface);
 		if (status != 0){
