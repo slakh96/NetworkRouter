@@ -236,6 +236,8 @@ void handle_ip_packet_to_be_sent_out(struct sr_instance *sr, uint8_t
 	assert(packet_with_ethernet);
 	sr_ip_hdr_t *ip_packet = (sr_ip_hdr_t*)(packet);
 	assert(ip_packet);
+	printf("The packet with ethernet headers added in is\n");
+	print_hdrs(packet_with_ethernet, len);
 
 	/* Make sure the packet is still alive before forwarding */
 	ip_packet->ip_ttl -= 1;
@@ -320,10 +322,21 @@ void handle_ip_packet_to_be_sent_out(struct sr_instance *sr, uint8_t
 	}
 	else { /*MAC addr found; create and send IP request*/
 		printf("Found MAC; sending IP request\n");
-		uint8_t *new_packet = prepare_to_send_ip_req(sr, packet, len, 
-		interface, arp_cache_entry);
-		ip_packet->ip_sum = 0; /*Reset to 0 for consistency*/
-		ip_packet->ip_sum = cksum(ip_packet, sizeof(sr_ip_hdr_t));
+		/*uint8_t *new_packet = prepare_to_send_ip_req(sr, packet, len, 
+		best_match->interface, arp_cache_entry);
+		sr_ip_hdr_t *new_ip_packet = (sr_ip_hdr_t*)(new_packet + 
+			sizeof(sr_ethernet_hdr_t));
+		assert(new_ip_packet);
+		new_ip_packet->ip_sum = 0; Reset to 0 for consistency
+		new_ip_packet->ip_sum = cksum(new_ip_packet, sizeof(sr_ip_hdr_t));
+		Manually recalculating checksum for icmp packet, if it exists
+		if (new_ip_packet->ip_p == ip_protocol_icmp){
+			printf("The packet we are forwarding is an icmp packet\n");
+			struct sr_icmp_hdr *icmp_packet = (struct sr_icmp_hdr *)(new_packet +\
+				sizeof(sr_ip_hdr_t) +	sizeof(sr_ethernet_hdr_t));
+			assert(icmp_packet);
+			icmp_packet->icmp_sum = cksum(icmp_packet, sizeof(struct sr_icmp_hdr));
+		}
 
 		struct sr_if *outgoing_interface = sr_get_interface(sr, interface);
 		if (outgoing_interface == 0) {
@@ -332,11 +345,19 @@ void handle_ip_packet_to_be_sent_out(struct sr_instance *sr, uint8_t
 			free(arp_cache_entry);
 			free(new_packet);
 			return;
-		}
-		printf("Preparing to forward the following packet, where ip->mac mapping found\n");
-		print_hdrs(new_packet, len + sizeof(sr_ethernet_hdr_t));
-		int status = sr_send_packet(sr, new_packet, len + 
-		sizeof(sr_ethernet_hdr_t), interface);
+		}*/
+		int new_packet_len = ntohs(ip_packet->ip_len) + sizeof(sr_ethernet_hdr_t);
+		uint8_t *new_packet = (uint8_t*)calloc(1, new_packet_len);
+		assert(new_packet);
+		add_ethernet_headers(sr, new_packet, best_match->interface,
+			arp_cache_entry->mac);
+		memcpy(new_packet + sizeof(sr_ethernet_hdr_t), ip_packet, 
+			ntohs(ip_packet->ip_len));
+		
+
+		/*printf("Preparing to forward the following packet, where ip->mac mapping found\n");
+		print_hdrs(new_packet, new_packet_len);*/
+		int status = sr_send_packet(sr, new_packet, new_packet_len, best_match->interface);
 		if (status != 0){
 			printf("An error occurred when sending packet! Status %d\n", status);
 		}
@@ -410,8 +431,9 @@ ether_dhost[ETHER_ADDR_LEN], uint8_t type, uint8_t code){
 	assert(ethernet_packet);
 	memcpy(ethernet_packet->ether_shost, ether_shost, ETHER_ADDR_LEN);
 
-	printf("About to send the following packet\n");
-	print_hdrs(packet, len);
+	/*printf("About to send the following packet\n");
+	print_hdrs(packet, len);*/
+	printf("Sent icmp3 reply\n");
   sr_send_packet(sr, packet, len, interface);
 	return;
 }
@@ -453,14 +475,15 @@ uint8_t ether_shost[ETHER_ADDR_LEN], uint8_t ether_dhost[ETHER_ADDR_LEN]) {
 	sr_ethernet_hdr_t *ethernet_packet = (sr_ethernet_hdr_t*)packet;
 	assert(ethernet_packet);
 	memcpy(ethernet_packet->ether_shost, ether_shost, ETHER_ADDR_LEN);
-	printf("About to send packet from icmp reply fn\n");
+	/*printf("About to send packet from icmp reply fn\n");
 
-	print_hdrs(packet, len);
+	print_hdrs(packet, len);*/
 	int status = sr_send_packet(sr, packet, len, interface);
 	if (status != 0) {
 		fprintf(stderr, "Error when sending icmp reply\n");
 		return;
 	}
+	printf("Sent icmp reply\n");
 	return;
 
 }
