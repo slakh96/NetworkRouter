@@ -75,7 +75,7 @@ uint32_t ip_dst) {
 
 		uint32_t ip_dst_mask = ip_dst & cur_routing_entry->mask.s_addr;
 		if (ip_dst_mask == (cur_routing_entry->mask.s_addr & 
-			cur_routing_entry->gw.s_addr)){
+			cur_routing_entry->dest.s_addr)){
 			/*Match found*/
 			printf("Match found\n");
 			if (longest_match == NULL || cur_routing_entry->mask.s_addr > 
@@ -236,8 +236,8 @@ void handle_ip_packet_to_be_sent_out(struct sr_instance *sr, uint8_t
 	assert(packet_with_ethernet);
 	sr_ip_hdr_t *ip_packet = (sr_ip_hdr_t*)(packet);
 	assert(ip_packet);
-	printf("The packet with ethernet headers added in is\n");
-	print_hdrs(packet_with_ethernet, len);
+	/*printf("The packet with ethernet headers added in is\n");
+	print_hdrs(packet_with_ethernet, len);*/
 
 	/* Make sure the packet is still alive before forwarding */
 	ip_packet->ip_ttl -= 1;
@@ -256,7 +256,7 @@ void handle_ip_packet_to_be_sent_out(struct sr_instance *sr, uint8_t
 			sizeof(sr_ethernet_hdr_t), 
 			interface, outgoing_interface->ip, ip_packet->ip_src,
 			outgoing_interface->addr, ethernet_packet->ether_shost,
-			0x11, 0x00);
+			11, 0);
 		free(empty_packet);
 		return;
 	}
@@ -290,7 +290,7 @@ void handle_ip_packet_to_be_sent_out(struct sr_instance *sr, uint8_t
 
 	/* Check ARP cache for MAC address corresponding to the next-hop IP*/
 	struct sr_arpentry *arp_cache_entry = sr_arpcache_lookup(&(sr->cache), 
-	best_match->gw.s_addr);/**/
+	best_match->dest.s_addr);/**/
 
 	if (arp_cache_entry == NULL) { /* No MAC addr found; make ARP req */
 		uint8_t *packet_with_ethernet = \
@@ -426,6 +426,16 @@ ether_dhost[ETHER_ADDR_LEN], uint8_t type, uint8_t code){
 	add_icmp3_headers(sr, packet + icmp3_offset, type, code,
 		len - icmp3_offset, packet + ip_offset);
 	add_ip_headers(sr, packet + ip_offset, ip_src, ip_dst, len - ip_offset);
+	sr_ip_hdr_t *ip_packet = (sr_ip_hdr_t*)(packet + ip_offset);
+	ip_packet->ip_p = ip_protocol_icmp; /*Make sure this is an icmp packet*/
+	
+	ip_packet->ip_dst = ip_dst;
+	ip_packet->ip_src = ip_src;
+	ip_packet->ip_sum = 0;
+  ip_packet->ip_sum = cksum(packet + ip_offset, ip_packet->ip_len);
+	printf("The IP dst after assigning to the packet is \n");
+  print_addr_ip_int(ntohl(ip_packet->ip_dst));
+
 	add_ethernet_headers(sr, packet, interface, ether_dhost);
 	sr_ethernet_hdr_t *ethernet_packet = (sr_ethernet_hdr_t*)packet;
 	assert(ethernet_packet);

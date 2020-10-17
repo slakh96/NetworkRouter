@@ -64,8 +64,8 @@ unsigned short outgoing_opcode){
 	/*Add the arp part to the request which already has ethernet headers*/
 	memcpy(packet_with_ethernet + sizeof(sr_ethernet_hdr_t), &created_arp_hdr, 
 		sizeof(struct sr_arp_hdr));
-	printf("Printing all headers of the packet to send out:\n");
-	print_hdrs(packet_with_ethernet, eth_pkt_size);
+	/*printf("Printing all headers of the packet to send out:\n");
+	print_hdrs(packet_with_ethernet, eth_pkt_size);*/
 	int status = sr_send_packet(sr, packet_with_ethernet, eth_pkt_size,
 		interface);
 	printf("Sent ARP packet\n");
@@ -191,8 +191,8 @@ unsigned int len, char *interface){
 		/*Set the newly discovered destination MAC address*/
 		memcpy(ethernet_buf->ether_dhost, arp_header->ar_sha, ETHER_ADDR_LEN);
 		printf("Preparing to send out the following queued IP packet\n");
-		print_hdrs(cur_packet->buf, cur_packet->len);
-		printf("printed=====================================================\n");
+		/*print_hdrs(cur_packet->buf, cur_packet->len);
+		printf("printed=====================================================\n");*/
 		int status = sr_send_packet(sr, cur_packet->buf, cur_packet->len,
 			cur_packet->iface);
 		if (status != 0){
