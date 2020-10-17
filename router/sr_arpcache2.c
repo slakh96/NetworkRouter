@@ -52,7 +52,7 @@ unsigned short outgoing_opcode){
 	unsigned int eth_pkt_size = sizeof(struct sr_arp_hdr) +\
 		sizeof(sr_ethernet_hdr_t);
 	uint8_t *packet_with_ethernet =\
-		(uint8_t*)calloc(1, eth_pkt_size);
+		(uint8_t*)malloc(eth_pkt_size);
 	assert(packet_with_ethernet);
 	
 	add_ethernet_headers(sr, packet_with_ethernet, interface, ar_tha);
@@ -64,8 +64,8 @@ unsigned short outgoing_opcode){
 	/*Add the arp part to the request which already has ethernet headers*/
 	memcpy(packet_with_ethernet + sizeof(sr_ethernet_hdr_t), &created_arp_hdr, 
 		sizeof(struct sr_arp_hdr));
-	printf("Printing all headers of the packet to send out:\n");
-	print_hdrs(packet_with_ethernet, eth_pkt_size);
+	/*printf("Printing all headers of the packet to send out:\n");
+	print_hdrs(packet_with_ethernet, eth_pkt_size);*/
 	int status = sr_send_packet(sr, packet_with_ethernet, eth_pkt_size,
 		interface);
 	printf("Sent ARP packet\n");
@@ -112,7 +112,7 @@ void sr_handle_arpreq(struct sr_instance *sr, struct sr_arpreq *arp_req) {
 
 				int total_size = sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t) +
 					sizeof(sr_icmp_t3_hdr_t);
-				uint8_t *new_packet = (uint8_t*)calloc(1, total_size);
+				uint8_t *new_packet = (uint8_t*)malloc(total_size);
 				assert(new_packet);
 				
 				struct sr_if *outgoing_interface = sr_get_interface(sr, cur_packet->iface);
@@ -191,15 +191,14 @@ unsigned int len, char *interface){
 		/*Set the newly discovered destination MAC address*/
 		memcpy(ethernet_buf->ether_dhost, arp_header->ar_sha, ETHER_ADDR_LEN);
 		printf("Preparing to send out the following queued IP packet\n");
-		print_hdrs(cur_packet->buf, cur_packet->len);
-		printf("printed=====================================================\n");
+		print_hdrs(cur_packet->buf);
+		printf("printed=====================================================\n")
 		int status = sr_send_packet(sr, cur_packet->buf, cur_packet->len,
 			cur_packet->iface);
 		if (status != 0){
 			fprintf(stderr, "Error when sending a queued packet\n");
 		}
-		struct sr_packet *next_packet = cur_packet->next;
-		cur_packet = next_packet;
+		cur_packet = cur_packet->next;
 	}
 	/*Delete the ARP request once all of the packets have been sent */
 	printf("Sent all of the packets, deleting the ARP request\n");
