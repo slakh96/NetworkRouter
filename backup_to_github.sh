@@ -6,7 +6,7 @@ make clean
 cd ..
 git add .
 git status
-echo 'Enter commit message here, or enter to skip:'
+echo 'Enter commit message here, or press enter to use default message:'
 read msg
 if [ ! -z "$msg" ]; then
 	git commit -a -m "$msg" || exit 1
