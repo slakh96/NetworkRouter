@@ -416,7 +416,7 @@ ether_dhost[ETHER_ADDR_LEN], uint8_t type, uint8_t code){
 	
 	printf("Reached sr_prep_and_send_icmp3_reply fn\n");
 	assert(packet);
-	unsigned int min_total_len = sizeof(sr_ethernet_hdr_t) + sizeof(
+	/*unsigned int min_total_len = sizeof(sr_ethernet_hdr_t) + sizeof(
 	  sr_ip_hdr_t) + sizeof(sr_icmp_t3_hdr_t);
 	unsigned int icmp3_offset = sizeof(sr_ethernet_hdr_t) + sizeof(
 		sr_ip_hdr_t);
@@ -427,7 +427,7 @@ ether_dhost[ETHER_ADDR_LEN], uint8_t type, uint8_t code){
 		len - icmp3_offset, packet + ip_offset);
 	add_ip_headers(sr, packet + ip_offset, ip_src, ip_dst, len - ip_offset);
 	sr_ip_hdr_t *ip_packet = (sr_ip_hdr_t*)(packet + ip_offset);
-	ip_packet->ip_p = ip_protocol_icmp; /*Make sure this is an icmp packet*/
+	ip_packet->ip_p = ip_protocol_icmp; Make sure this is an icmp packet
 	
 	ip_packet->ip_dst = ip_dst;
 	ip_packet->ip_src = ip_src;
@@ -439,12 +439,46 @@ ether_dhost[ETHER_ADDR_LEN], uint8_t type, uint8_t code){
 	add_ethernet_headers(sr, packet, interface, ether_dhost);
 	sr_ethernet_hdr_t *ethernet_packet = (sr_ethernet_hdr_t*)packet;
 	assert(ethernet_packet);
-	memcpy(ethernet_packet->ether_shost, ether_shost, ETHER_ADDR_LEN);
+	memcpy(ethernet_packet->ether_shost, ether_shost, ETHER_ADDR_LEN);*/
 
-	/*printf("About to send the following packet\n");
-	print_hdrs(packet, len);*/
+	sr_ethernet_hdr_t *ethernet_packet = (sr_ethernet_hdr_t*)packet;
+	assert(ethernet_packet);
+	memcpy(ethernet_packet->ether_dhost, ether_dhost, ETHER_ADDR_LEN);
+	memcpy(ethernet_packet->ether_shost, ether_shost, ETHER_ADDR_LEN);
+	ethernet_packet->ether_type = htons(ethertype_ip);
+				
+	sr_ip_hdr_t *ip_packet = (sr_ip_hdr_t*)(packet + sizeof(sr_ethernet_hdr_t));
+	assert(ip_packet);
+	ip_packet->ip_v = 4;
+	ip_packet->ip_hl = 5;
+	ip_packet->ip_tos = 0;
+	ip_packet->ip_len = sizeof(sr_ip_hdr_t);
+	ip_packet->ip_id = 0;
+	ip_packet->ip_off = 0;
+	ip_packet->ip_ttl = 64;
+	ip_packet->ip_p = 0x01;
+	ip_packet->ip_src = ip_src;
+	ip_packet->ip_dst = ip_dst;
+	ip_packet->ip_sum = 0;
+	ip_packet->ip_sum = cksum(packet + sizeof(sr_ethernet_hdr_t), ip_packet->ip_len);
+
+	struct sr_icmp_hdr *icmp_packet = (struct sr_icmp_hdr*)(packet +\
+		sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t));
+	assert(icmp_packet);
+	icmp_packet->icmp_type = type;
+	icmp_packet->icmp_code = code;
+	icmp_packet->icmp_sum = 0;
+	icmp_packet->icmp_sum = cksum(packet + sizeof(sr_ethernet_hdr_t) +\
+		sizeof(sr_ip_hdr_t), sizeof(struct sr_icmp_hdr));
+
+	printf("About to send the following packet\n");
+	print_hdrs(packet, len);
+  int status = sr_send_packet(sr, packet, len, interface);
+	if (status != 0){
+		fprintf(stderr, "Error when sending icmp3 reply\n");
+		return;
+	}
 	printf("Sent icmp3 reply\n");
-  sr_send_packet(sr, packet, len, interface);
 	return;
 }
 
@@ -470,25 +504,75 @@ uint8_t ether_shost[ETHER_ADDR_LEN], uint8_t ether_dhost[ETHER_ADDR_LEN]) {
 	assert(interface);
 	unsigned int min_total_len = sizeof(sr_ethernet_hdr_t) + sizeof(
 		sr_ip_hdr_t) + sizeof(sr_icmp_hdr_t);
-	unsigned int icmp_offset = sizeof(sr_ethernet_hdr_t) + sizeof(
+	/*unsigned int icmp_offset = sizeof(sr_ethernet_hdr_t) + sizeof(
 		sr_ip_hdr_t);
-	unsigned int ip_offset = sizeof(sr_ethernet_hdr_t);
+	unsigned int ip_offset = sizeof(sr_ethernet_hdr_t);*/
 	assert(len >= min_total_len);
+
+	printf("The ip src & dst is\n");
+	print_addr_ip_int(ntohl(ip_src));
+	print_addr_ip_int(ntohl(ip_dst));
+	printf("The ethernet src & dst is\n");
+	print_addr_eth(ether_shost);
+	print_addr_eth(ether_dhost);
+	printf("Sizeof icmp is %lu\n", sizeof(sr_icmp_hdr_t));
+	printf("Sizeof ip is %lu\n", sizeof(sr_ip_hdr_t));
+	printf("Sizeof ethernet is %lu\n", sizeof(sr_ethernet_hdr_t));
 	
 	/*Add all three headers*/
-	add_icmp_headers(sr, packet + icmp_offset, 0x00, 0x00, 
+	/*add_icmp_headers(sr, packet + icmp_offset, 0x00, 0x00, 
 		len - icmp_offset);
 	add_ip_headers(sr, packet + ip_offset, ip_src, ip_dst, len - ip_offset);
 	add_ethernet_headers(sr, packet, interface, ether_dhost);
 	
-	/*Overwrite source host of ethernet packet to ensure correctness*/
+	Overwrite source host of ethernet packet to ensure correctness
 	sr_ethernet_hdr_t *ethernet_packet = (sr_ethernet_hdr_t*)packet;
 	assert(ethernet_packet);
-	memcpy(ethernet_packet->ether_shost, ether_shost, ETHER_ADDR_LEN);
-	/*printf("About to send packet from icmp reply fn\n");
+	memcpy(ethernet_packet->ether_shost, ether_shost, ETHER_ADDR_LEN);*/
 
-	print_hdrs(packet, len);*/
-	int status = sr_send_packet(sr, packet, len, interface);
+	
+
+
+	uint8_t *new_packet = calloc(1, min_total_len);
+
+	sr_ethernet_hdr_t *ethernet_packet = (sr_ethernet_hdr_t*)new_packet;
+	assert(ethernet_packet);
+	memcpy(ethernet_packet->ether_dhost, ether_dhost, ETHER_ADDR_LEN);
+	memcpy(ethernet_packet->ether_shost, ether_shost, ETHER_ADDR_LEN);
+	ethernet_packet->ether_type = htons(ethertype_ip);
+
+	sr_ip_hdr_t *ip_packet = (sr_ip_hdr_t*)(new_packet +\
+		sizeof(sr_ethernet_hdr_t));
+	assert(ip_packet);
+	ip_packet->ip_v = 4;
+	ip_packet->ip_hl = 5;
+	ip_packet->ip_tos = 0;
+	ip_packet->ip_len = htons(sizeof(sr_ip_hdr_t) + sizeof(struct sr_icmp_hdr));
+	ip_packet->ip_id = 0;
+	ip_packet->ip_off = 0;
+	ip_packet->ip_ttl = 64;
+	ip_packet->ip_p = 0x01;
+	ip_packet->ip_src = ip_src;
+	ip_packet->ip_dst = ip_dst;
+	ip_packet->ip_sum = 0;
+	ip_packet->ip_sum = cksum(new_packet + sizeof(sr_ethernet_hdr_t), 
+		ip_packet->ip_len);
+	
+	struct sr_icmp_hdr *icmp_packet = (struct sr_icmp_hdr*)(new_packet +\
+		sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t));
+	assert(icmp_packet);
+
+	icmp_packet->icmp_type = 0;
+	icmp_packet->icmp_code = 0;
+	icmp_packet->icmp_sum = 0;
+	icmp_packet->icmp_sum = cksum(new_packet + sizeof(sr_ethernet_hdr_t) +\
+		sizeof(sr_ip_hdr_t), sizeof(struct sr_icmp_hdr));
+
+	printf("About to send packet from icmp reply fn\n");
+
+	print_hdrs(new_packet, len);
+	int status = sr_send_packet(sr, new_packet, min_total_len, interface);
+	free(new_packet);
 	if (status != 0) {
 		fprintf(stderr, "Error when sending icmp reply\n");
 		return;
@@ -521,11 +605,11 @@ unsigned int len, char *interface){
 	assert(ip_header);
 	
 	/*Check if the checksum is valid*/
-	uint16_t calculated_sum = cksum(packet + icmp_offset, len - icmp_offset);
+	/*uint16_t calculated_sum = cksum(packet + icmp_offset, len - icmp_offset);
 	if (calculated_sum != icmp_packet->icmp_sum){
 		printf("Checksum of ICMP invalid");
 		return;
-	}
+	}*/
 	if (icmp_packet->icmp_type == 0x08 && icmp_packet->icmp_code == 0x00) {
 		/*Echo request*/
 		uint8_t *new_packet = (uint8_t*)calloc(1, icmp_offset + sizeof(sr_icmp_hdr_t));
@@ -594,6 +678,7 @@ int len, char *interface, uint8_t* packet_with_ethernet){
 		if (ip_packet->ip_p == ip_protocol_icmp) {
 			sr_handle_icmp_request(sr, packet_with_ethernet, len + 
 			sizeof(sr_ethernet_hdr_t), interface);
+			return;
 		}
 		/*Check if TCP or UDP packet*/
 		else if (ip_packet->ip_p == 0x0006 || ip_packet->ip_p == 0x0011){
