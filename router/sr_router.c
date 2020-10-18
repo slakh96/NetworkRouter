@@ -530,10 +530,8 @@ uint8_t ether_shost[ETHER_ADDR_LEN], uint8_t ether_dhost[ETHER_ADDR_LEN]) {
 	assert(ethernet_packet);
 	memcpy(ethernet_packet->ether_shost, ether_shost, ETHER_ADDR_LEN);*/
 
-	
 
-
-	uint8_t *new_packet = calloc(1, min_total_len);
+	uint8_t *new_packet = calloc(1, len);
 
 	sr_ethernet_hdr_t *ethernet_packet = (sr_ethernet_hdr_t*)new_packet;
 	assert(ethernet_packet);
@@ -547,7 +545,7 @@ uint8_t ether_shost[ETHER_ADDR_LEN], uint8_t ether_dhost[ETHER_ADDR_LEN]) {
 	ip_packet->ip_v = 4;
 	ip_packet->ip_hl = 5;
 	ip_packet->ip_tos = 0;
-	ip_packet->ip_len = htons(sizeof(sr_ip_hdr_t) + sizeof(struct sr_icmp_hdr));
+	ip_packet->ip_len = htons(len - sizeof(sr_ethernet_hdr_t));
 	ip_packet->ip_id = 0;
 	ip_packet->ip_off = 0;
 	ip_packet->ip_ttl = 64;
@@ -567,11 +565,19 @@ uint8_t ether_shost[ETHER_ADDR_LEN], uint8_t ether_dhost[ETHER_ADDR_LEN]) {
 	icmp_packet->icmp_sum = 0;
 	icmp_packet->icmp_sum = cksum(new_packet + sizeof(sr_ethernet_hdr_t) +\
 		sizeof(sr_ip_hdr_t), sizeof(struct sr_icmp_hdr));
+	
+	struct sr_rt *best_match = find_longest_prefix_match(sr,
+		ip_packet->ip_dst);
+	if (best_match == NULL) {
+		fprintf(stderr, "No best match found\n");
+	}
+
+		
 
 	printf("About to send packet from icmp reply fn\n");
 
 	print_hdrs(new_packet, len);
-	int status = sr_send_packet(sr, new_packet, min_total_len, interface);
+	int status = sr_send_packet(sr, new_packet, len, best_match->interface);
 	free(new_packet);
 	if (status != 0) {
 		fprintf(stderr, "Error when sending icmp reply\n");
@@ -677,7 +683,7 @@ int len, char *interface, uint8_t* packet_with_ethernet){
 		/*Check if icmp request */
 		if (ip_packet->ip_p == ip_protocol_icmp) {
 			sr_handle_icmp_request(sr, packet_with_ethernet, len + 
-			sizeof(sr_ethernet_hdr_t), interface);
+			sizeof(sr_ethernet_hdr_t), addressed_interface->name);
 			return;
 		}
 		/*Check if TCP or UDP packet*/
