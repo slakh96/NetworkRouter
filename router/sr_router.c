@@ -529,9 +529,41 @@ uint8_t ether_shost[ETHER_ADDR_LEN], uint8_t ether_dhost[ETHER_ADDR_LEN]) {
 	sr_ethernet_hdr_t *ethernet_packet = (sr_ethernet_hdr_t*)packet;
 	assert(ethernet_packet);
 	memcpy(ethernet_packet->ether_shost, ether_shost, ETHER_ADDR_LEN);*/
+	printf("Packet at start of icmp fn is \n");
+	print_hdrs(packet, len);
+	sr_ethernet_hdr_t *ethernet_packet = (sr_ethernet_hdr_t*)packet;
+	assert(ethernet_packet);
+	/*memcpy(ethernet_packet->ether_dhost, ether_dhost, ETHER_ADDR_LEN);*/
+	uint8_t temp_src[ETHER_ADDR_LEN];
+	uint8_t temp_dst[ETHER_ADDR_LEN];
+	memcpy(temp_src, ether_shost, ETHER_ADDR_LEN);
+	memcpy(temp_dst, ether_dhost, ETHER_ADDR_LEN);
 
+	memcpy(ethernet_packet->ether_shost, temp_src, ETHER_ADDR_LEN);
+	memcpy(ethernet_packet->ether_dhost, temp_dst, ETHER_ADDR_LEN);
+	
+	sr_ip_hdr_t *ip_packet = (sr_ip_hdr_t*)(packet +\
+		sizeof(sr_ethernet_hdr_t));
+	assert(ip_packet);
+	ip_packet->ip_src = ip_src;
+	ip_packet->ip_dst = ip_dst;
+	
+	sr_icmp_hdr_t *icmp_packet = (sr_icmp_hdr_t*)(packet +\
+	sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t));
+	assert(icmp_packet);
+	icmp_packet->icmp_type = 0;
+	icmp_packet->icmp_code = 0;
+	icmp_packet->icmp_sum = 0;
+	icmp_packet->icmp_sum = cksum(packet + sizeof(sr_ethernet_hdr_t) +\
+		sizeof(sr_ip_hdr_t), sizeof(sr_icmp_hdr_t));
+	
+	struct sr_rt *best_match = find_longest_prefix_match(sr,
+		ip_packet->ip_dst);
+	if (best_match == NULL) {
+		fprintf(stderr, "No best match found\n");
+	}
 
-	uint8_t *new_packet = calloc(1, len);
+	/*uint8_t *new_packet = calloc(1, len);
 
 	sr_ethernet_hdr_t *ethernet_packet = (sr_ethernet_hdr_t*)new_packet;
 	assert(ethernet_packet);
@@ -570,15 +602,18 @@ uint8_t ether_shost[ETHER_ADDR_LEN], uint8_t ether_dhost[ETHER_ADDR_LEN]) {
 		ip_packet->ip_dst);
 	if (best_match == NULL) {
 		fprintf(stderr, "No best match found\n");
-	}
+	}*/
 
 		
 
 	printf("About to send packet from icmp reply fn\n");
 
-	print_hdrs(new_packet, len);
-	int status = sr_send_packet(sr, new_packet, len, best_match->interface);
-	free(new_packet);
+	print_hdrs(packet, len);
+
+	
+
+	int status = sr_send_packet(sr, packet, len, best_match->interface);
+	/*free(new_packet);*/
 	if (status != 0) {
 		fprintf(stderr, "Error when sending icmp reply\n");
 		return;
@@ -620,7 +655,7 @@ unsigned int len, char *interface){
 		/*Echo request*/
 		uint8_t *new_packet = (uint8_t*)calloc(1, icmp_offset + sizeof(sr_icmp_hdr_t));
 		assert(new_packet);
-		sr_prep_and_send_icmp_reply(sr, new_packet, len, interface, 
+		sr_prep_and_send_icmp_reply(sr, packet, len, interface, 
 			ip_header->ip_dst,ip_header->ip_src, ethernet_header->ether_dhost, 
 			ethernet_header->ether_shost);
 		free(new_packet);
