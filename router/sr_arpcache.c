@@ -121,7 +121,7 @@ void sr_handle_arpreq(struct sr_instance *sr, struct sr_arpreq *arp_req) {
 					return;
 				}
 
-				sr_prep_and_send_icmp3_reply(sr, new_packet, total_size, cur_packet->iface,
+				sr_prep_and_send_icmp3_reply(sr, cur_packet->buf, total_size, cur_packet->iface,
 					outgoing_interface->ip, ip_header->ip_dst, outgoing_interface->addr, 
 					ethernet_packet->ether_shost, 3, 1);
 				cur_packet = cur_packet->next;
