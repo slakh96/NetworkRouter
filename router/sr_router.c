@@ -467,6 +467,8 @@ ether_dhost[ETHER_ADDR_LEN], uint8_t type, uint8_t code){
 		sizeof(sr_ip_hdr_t));
 	memcpy(new_packet + sizeof(sr_ethernet_hdr_t), ip_packet, 
 		sizeof(sr_ip_hdr_t));
+
+	unsigned int ip_data_length = ntohs(ip_packet->ip_len) - sizeof(sr_ip_hdr_t);
  
   sr_icmp_t3_hdr_t icmp3_packet;
   /*assert(icmp3_packet);*/
@@ -478,7 +480,7 @@ ether_dhost[ETHER_ADDR_LEN], uint8_t type, uint8_t code){
 
   icmp3_packet.icmp_sum = 0;
   icmp3_packet.icmp_sum = cksum(new_packet + sizeof(sr_ethernet_hdr_t) +\
-     sizeof(sr_ip_hdr_t), sizeof(sr_icmp_t3_hdr_t));
+     sizeof(sr_ip_hdr_t), sizeof(sr_icmp_t3_hdr_t) + ip_data_length);
 	
 	memcpy(new_packet + sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t),
 		&icmp3_packet, sizeof(sr_icmp_t3_hdr_t));
