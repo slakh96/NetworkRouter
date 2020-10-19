@@ -707,13 +707,18 @@ unsigned int len, char *interface){
 	assert(ethernet_header);
 	sr_ip_hdr_t *ip_header = (sr_ip_hdr_t*)(packet + sizeof(sr_ethernet_hdr_t));
 	assert(ip_header);
+	unsigned int ip_data_length = ntohs(ip_header->ip_len) - sizeof(sr_ip_hdr_t);
 	
 	/*Check if the checksum is valid*/
-	/*uint16_t calculated_sum = cksum(packet + icmp_offset, len - icmp_offset);
-	if (calculated_sum != icmp_packet->icmp_sum){
-		printf("Checksum of ICMP invalid");
+	int cur_checksum = icmp_packet->icmp_sum;
+	icmp_packet->icmp_sum = 0;
+	uint16_t calculated_sum = cksum(packet + icmp_offset, 
+		sizeof(sr_icmp_hdr_t) + ip_data_length);
+	if (calculated_sum != cur_checksum){
+		printf("Checksum of ICMP invalid\n");
 		return;
-	}*/
+	}
+	icmp_packet->icmp_sum = cur_checksum; /*Put the checksum back*/
 	if (icmp_packet->icmp_type == 0x08 && icmp_packet->icmp_code == 0x00) {
 		/*Echo request*/
 		uint8_t *new_packet = (uint8_t*)calloc(1, icmp_offset + sizeof(sr_icmp_hdr_t));
