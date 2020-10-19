@@ -20,7 +20,8 @@
 */
 struct sr_arp_hdr create_arp_hdr(unsigned short ar_op, uint32_t ar_sip,
 uint32_t ar_tip, unsigned char ar_sha[6], unsigned char ar_tha[6]){
-
+	
+	printf("Reached create_arp_hdr fn\n");
 	struct sr_arp_hdr arp_hdr;
 	arp_hdr.ar_op = htons(ar_op);
 	arp_hdr.ar_sip = ar_sip;
@@ -110,7 +111,7 @@ void sr_handle_arpreq(struct sr_instance *sr, struct sr_arpreq *arp_req) {
 					sizeof(sr_ethernet_hdr_t));
 				assert(ip_header);
 
-				int total_size = sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t) +
+				int total_size = sizeof(sr_ethernet_hdr_t) + ip_header->ip_len +
 					sizeof(sr_icmp_t3_hdr_t);
 				uint8_t *new_packet = (uint8_t*)calloc(1, total_size);
 				assert(new_packet);

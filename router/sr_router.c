@@ -612,6 +612,7 @@ uint8_t ether_shost[ETHER_ADDR_LEN], uint8_t ether_dhost[ETHER_ADDR_LEN]) {
 	assert(ip_packet);
 	ip_packet->ip_src = ip_src;
 	ip_packet->ip_dst = ip_dst;
+	ip_packet->ip_p = ip_protocol_icmp;
 	
 	unsigned int ip_data_length = ntohs(ip_packet->ip_len) - sizeof(sr_ip_hdr_t);
 
@@ -712,7 +713,8 @@ unsigned int len, char *interface){
 	sr_ip_hdr_t *ip_header = (sr_ip_hdr_t*)(packet + sizeof(sr_ethernet_hdr_t));
 	assert(ip_header);
 	unsigned int ip_data_length = ntohs(ip_header->ip_len) - sizeof(sr_ip_hdr_t);
-	
+	printf("The current icmp request is the following\n");
+	print_hdrs(packet, len);
 	/*Check if the checksum is valid*/
 	int cur_checksum = icmp_packet->icmp_sum;
 	icmp_packet->icmp_sum = 0;
