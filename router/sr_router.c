@@ -629,6 +629,27 @@ uint8_t ether_shost[ETHER_ADDR_LEN], uint8_t ether_dhost[ETHER_ADDR_LEN]) {
 		ip_packet->ip_dst);
 	if (best_match == NULL) {
 		fprintf(stderr, "No best match found\n");
+		return;
+	}
+
+	/*Check ARP cache for MAC address corresponding to next-hop ip*/
+	struct sr_arpentry *arp_cache_entry = sr_arpcache_lookup(&(sr->cache),
+		best_match->dest.s_addr);
+	
+	if (arp_cache_entry == NULL){
+		/*unsigned char broadcast_mac[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};*/
+		/*TODO: Might have to make the ethernet packets destination address
+		the broadcast addr*/
+		
+		struct sr_arpreq *arp_req = sr_arpcache_queuereq(&(sr->cache), 
+			best_match->gw.s_addr, packet, len, best_match->interface);
+
+		if (arp_req == NULL){
+			fprintf(stderr, "Error occurred; the arp_req returned from\
+				starter code was NULL\n");
+			return;
+		}
+		return;
 	}
 
 	/*uint8_t *new_packet = calloc(1, len);
@@ -678,10 +699,11 @@ uint8_t ether_shost[ETHER_ADDR_LEN], uint8_t ether_dhost[ETHER_ADDR_LEN]) {
 
 	print_hdrs(packet, len);*/
 
-	
+	memcpy(ethernet_packet->ether_dhost, arp_cache_entry->mac, 
+		ETHER_ADDR_LEN);
 
 	int status = sr_send_packet(sr, packet, len, best_match->interface);
-	/*free(new_packet);*/
+	free(arp_cache_entry);
 	if (status != 0) {
 		fprintf(stderr, "Error when sending icmp reply\n");
 		return;
