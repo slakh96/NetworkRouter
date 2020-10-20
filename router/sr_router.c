@@ -480,7 +480,7 @@ ether_dhost[ETHER_ADDR_LEN], uint8_t type, uint8_t code){
 
   icmp3_packet.icmp_sum = 0;
   icmp3_packet.icmp_sum = cksum(new_packet + sizeof(sr_ethernet_hdr_t) +\
-     sizeof(sr_ip_hdr_t), sizeof(sr_icmp_t3_hdr_t) + ip_data_length);
+     sizeof(sr_ip_hdr_t), sizeof(sr_icmp_t3_hdr_t));
 	
 	memcpy(new_packet + sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t),
 		&icmp3_packet, sizeof(sr_icmp_t3_hdr_t));
@@ -740,12 +740,13 @@ unsigned int len, char *interface){
 	/*Check if the checksum is valid*/
 	int cur_checksum = icmp_packet->icmp_sum;
 	icmp_packet->icmp_sum = 0;
+	/*
 	uint16_t calculated_sum = cksum(packet + icmp_offset, 
 		sizeof(sr_icmp_hdr_t) + ip_data_length);
 	if (calculated_sum != cur_checksum){
 		printf("Checksum of ICMP invalid\n");
 		return;
-	}
+	}*/
 	icmp_packet->icmp_sum = cur_checksum; /*Put the checksum back*/
 	if (icmp_packet->icmp_type == 0x08 && icmp_packet->icmp_code == 0x00) {
 		/*Echo request*/
