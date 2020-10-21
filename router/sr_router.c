@@ -493,6 +493,8 @@ uint8_t ether_shost[ETHER_ADDR_LEN], uint8_t ether_dhost[ETHER_ADDR_LEN]) {
 	sr_ethernet_hdr_t *ethernet_packet = (sr_ethernet_hdr_t*)packet;
 	assert(ethernet_packet);
 
+	/*Copy in the source and destination addresses; the dest address
+	eventually gets overwritten with the result of the ARP request*/
 	uint8_t temp_src[ETHER_ADDR_LEN];
 	uint8_t temp_dst[ETHER_ADDR_LEN];
 	memcpy(temp_src, ether_shost, ETHER_ADDR_LEN);
@@ -500,7 +502,8 @@ uint8_t ether_shost[ETHER_ADDR_LEN], uint8_t ether_dhost[ETHER_ADDR_LEN]) {
 
 	memcpy(ethernet_packet->ether_shost, temp_src, ETHER_ADDR_LEN);
 	memcpy(ethernet_packet->ether_dhost, temp_dst, ETHER_ADDR_LEN);
-	
+
+	/*Set some parameters for the ip packet*/	
 	sr_ip_hdr_t *ip_packet = (sr_ip_hdr_t*)(packet +\
 		sizeof(sr_ethernet_hdr_t));
 	assert(ip_packet);
@@ -531,10 +534,7 @@ uint8_t ether_shost[ETHER_ADDR_LEN], uint8_t ether_dhost[ETHER_ADDR_LEN]) {
 		best_match->dest.s_addr);
 	
 	if (arp_cache_entry == NULL){
-		/*unsigned char broadcast_mac[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};*/
-		/*TODO: Might have to make the ethernet packets destination address
-		the broadcast addr*/
-		
+		/*No MAC addr found; make ARP request*/	
 		struct sr_arpreq *arp_req = sr_arpcache_queuereq(&(sr->cache), 
 			best_match->gw.s_addr, packet, len, best_match->interface);
 
@@ -582,19 +582,18 @@ unsigned int len, char *interface){
 	sr_ip_hdr_t *ip_header = (sr_ip_hdr_t*)(packet + sizeof(sr_ethernet_hdr_t));
 	assert(ip_header);
 	unsigned int ip_data_length = ntohs(ip_header->ip_len) - sizeof(sr_ip_hdr_t);
-	printf("The current icmp request is the following\n");
-	print_hdrs(packet, len);
+
 	/*Check if the checksum is valid*/
 	int cur_checksum = icmp_packet->icmp_sum;
 	icmp_packet->icmp_sum = 0;
-
-	uint16_t calculated_sum = cksum(packet + icmp_offset, 
-		ip_data_length);
+	uint16_t calculated_sum = cksum(packet + icmp_offset, ip_data_length);
 	if (calculated_sum != cur_checksum){
 		printf("Checksum of ICMP invalid\n");
 		return;
 	}
+
 	icmp_packet->icmp_sum = cur_checksum; /*Put the checksum back*/
+	
 	if (icmp_packet->icmp_type == 0x08 && icmp_packet->icmp_code == 0x00) {
 		/*Echo request*/
 		uint8_t *new_packet = (uint8_t*)calloc(1, icmp_offset + sizeof(sr_icmp_hdr_t));
@@ -605,7 +604,7 @@ unsigned int len, char *interface){
 		free(new_packet);
 	}
 	else {
-		printf("An unknown ICMP request arrived\n");
+		fprintf(stderr, "An unknown ICMP request arrived\n");
 		return;
 	}	
 }
@@ -677,6 +676,7 @@ int len, char *interface, uint8_t* packet_with_ethernet){
 			uint8_t *new_packet = (uint8_t*)calloc(1, len+sizeof(sr_ethernet_hdr_t));
 			assert(new_packet);
 
+			/*Send icmp reply regarding the TCP/UDP packet*/
 			sr_prep_and_send_icmp3_reply(sr, packet_with_ethernet,	len + 
 				sizeof(sr_ethernet_hdr_t), interface, outgoing_interface->ip,
 				ip_packet->ip_src, outgoing_interface->addr,
@@ -723,12 +723,6 @@ void sr_handlepacket(struct sr_instance* sr,
   assert(interface);
 
   printf("*********************** -> Received packet of length %d \n",len);
-  printf("REACHED sr_handlepacket\n");
-  /*print_hdr_eth(packet);
-	print_hdrs(packet, len);*/
-  /* fill in code here */
-	/*printf("The routing table entries are the following: \n");
-	sr_print_routing_table(sr);*/
 
 	int minEthernetLength = sizeof(sr_ethernet_hdr_t);
 	if (len < minEthernetLength) {
