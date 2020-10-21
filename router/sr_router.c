@@ -740,13 +740,13 @@ unsigned int len, char *interface){
 	/*Check if the checksum is valid*/
 	int cur_checksum = icmp_packet->icmp_sum;
 	icmp_packet->icmp_sum = 0;
-	/*
+
 	uint16_t calculated_sum = cksum(packet + icmp_offset, 
-		sizeof(sr_icmp_hdr_t) + ip_data_length);
+		ip_data_length);
 	if (calculated_sum != cur_checksum){
 		printf("Checksum of ICMP invalid\n");
 		return;
-	}*/
+	}
 	icmp_packet->icmp_sum = cur_checksum; /*Put the checksum back*/
 	if (icmp_packet->icmp_type == 0x08 && icmp_packet->icmp_code == 0x00) {
 		/*Echo request*/
