@@ -480,7 +480,7 @@ ether_dhost[ETHER_ADDR_LEN], uint8_t type, uint8_t code){
 
   icmp3_packet.icmp_sum = 0;
   icmp3_packet.icmp_sum = cksum(new_packet + sizeof(sr_ethernet_hdr_t) +\
-     sizeof(sr_ip_hdr_t), sizeof(sr_icmp_t3_hdr_t));
+     sizeof(sr_ip_hdr_t), ip_data_length);
 	
 	memcpy(new_packet + sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t),
 		&icmp3_packet, sizeof(sr_icmp_t3_hdr_t));
@@ -623,7 +623,7 @@ uint8_t ether_shost[ETHER_ADDR_LEN], uint8_t ether_dhost[ETHER_ADDR_LEN]) {
 	icmp_packet->icmp_code = 0;
 	icmp_packet->icmp_sum = 0;
 	icmp_packet->icmp_sum = cksum(packet + sizeof(sr_ethernet_hdr_t) +\
-		sizeof(sr_ip_hdr_t), sizeof(sr_icmp_hdr_t) + ip_data_length);
+		sizeof(sr_ip_hdr_t), + ip_data_length);
 	
 	struct sr_rt *best_match = find_longest_prefix_match(sr,
 		ip_packet->ip_dst);
