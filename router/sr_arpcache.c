@@ -55,18 +55,19 @@ unsigned short outgoing_opcode){
 	uint8_t *packet_with_ethernet =\
 		(uint8_t*)calloc(1, eth_pkt_size);
 	assert(packet_with_ethernet);
-	
+
+	/*Add ethernet headers to the ARP request*/	
 	add_ethernet_headers(sr, packet_with_ethernet, interface, ar_tha);
 	sr_ethernet_hdr_t* eth_pkt = (sr_ethernet_hdr_t*)packet_with_ethernet;
 	eth_pkt->ether_type = htons(ethertype_arp);
 
 	struct sr_arp_hdr created_arp_hdr = create_arp_hdr(outgoing_opcode,
 		ar_sip, ar_tip, ar_sha, ar_tha);
+	
 	/*Add the arp part to the request which already has ethernet headers*/
 	memcpy(packet_with_ethernet + sizeof(sr_ethernet_hdr_t), &created_arp_hdr, 
 		sizeof(struct sr_arp_hdr));
-	/*printf("Printing all headers of the packet to send out:\n");
-	print_hdrs(packet_with_ethernet, eth_pkt_size);*/
+	
 	int status = sr_send_packet(sr, packet_with_ethernet, eth_pkt_size,
 		interface);
 	printf("Sent ARP packet\n");
@@ -93,7 +94,7 @@ void sr_handle_arpreq(struct sr_instance *sr, struct sr_arpreq *arp_req) {
 	time_t cur_time = time(NULL); /*Gives the time since Jan 1 1970 in seconds*/
 
 	if (cur_time - arp_req->sent >= 1){ /*If haven't sent in past second*/
-		assert(arp_req->packets);/*TODO: Ensure that this is a correct assertion to make*/
+		assert(arp_req->packets);
 		       
 		unsigned char broadcast_mac[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
 		struct sr_if *outgoing_interface = sr_get_interface(sr, arp_req->packets->iface);
@@ -102,17 +103,21 @@ void sr_handle_arpreq(struct sr_instance *sr, struct sr_arpreq *arp_req) {
 			return;
 		}
 
+		/*If sent at least 5 times, assume that we will never get a reply*/
 		if (arp_req->times_sent >= 5){
 			struct sr_packet *cur_packet = arp_req->packets;
+
+			/*Send ICMP msg to each packet waiting on this ARP reply*/
 			while (cur_packet != NULL){
+
 				sr_ethernet_hdr_t *ethernet_packet = (sr_ethernet_hdr_t*)cur_packet->buf;
 				assert(ethernet_packet);
 				sr_ip_hdr_t *ip_header = (sr_ip_hdr_t*)(cur_packet->buf +\
 					sizeof(sr_ethernet_hdr_t));
 				assert(ip_header);
-
 				int total_size = sizeof(sr_ethernet_hdr_t) + ip_header->ip_len +
 					sizeof(sr_icmp_t3_hdr_t);
+
 				uint8_t *new_packet = (uint8_t*)calloc(1, total_size);
 				assert(new_packet);
 				
@@ -121,7 +126,7 @@ void sr_handle_arpreq(struct sr_instance *sr, struct sr_arpreq *arp_req) {
 					fprintf(stderr, "Error getting outgoing interface when sending ARP req\n");
 					return;
 				}
-
+				/*Prepare and send the icmp3 reply*/
 				sr_prep_and_send_icmp3_reply(sr, cur_packet->buf, total_size, cur_packet->iface,
 					outgoing_interface->ip, ip_header->ip_dst, outgoing_interface->addr, 
 					ethernet_packet->ether_shost, 3, 1);
@@ -130,7 +135,8 @@ void sr_handle_arpreq(struct sr_instance *sr, struct sr_arpreq *arp_req) {
 			sr_arpreq_destroy(&(sr->cache), arp_req);
 			return;
 		}
-		else {
+		else {/*Send out ARP request again*/
+
 			/*The sender ip comes from the interface of the first packet*/
 			uint32_t sender_ip = outgoing_interface->ip;
 			uint32_t receiving_ip = arp_req->ip;
@@ -191,9 +197,8 @@ unsigned int len, char *interface){
 
 		/*Set the newly discovered destination MAC address*/
 		memcpy(ethernet_buf->ether_dhost, arp_header->ar_sha, ETHER_ADDR_LEN);
-		printf("Preparing to send out the following queued IP packet\n");
-		/*print_hdrs(cur_packet->buf, cur_packet->len);
-		printf("printed=====================================================\n");*/
+		printf("Preparing to send out a queued IP packet\n");
+
 		int status = sr_send_packet(sr, cur_packet->buf, cur_packet->len,
 			cur_packet->iface);
 		if (status != 0){
@@ -229,7 +234,7 @@ int len, char *interface){
 	assert(len >= sizeof(sr_arp_hdr_t));
 	sr_arp_hdr_t *arp_header = (sr_arp_hdr_t*)packet;
 	assert(arp_header);
-	/*print_hdr_arp(packet);*/
+
 	/*Determine if ARP packet is addressed to us */
 	struct sr_if *addressed_interface =\
 		find_addressed_interface(sr, arp_header->ar_tip);
@@ -254,12 +259,10 @@ int len, char *interface){
 	}
 	else {
 		/*Some weird packet; don't reply*/
-		printf("Unknown ARP packet type\n");
+		fprintf(stderr, "Unknown ARP packet type\n");
 		return;
 	}
-
 }
-
 
 /* 
   This function gets called every second. For each request sent out, we keep
