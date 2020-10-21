@@ -67,17 +67,20 @@ void sr_init(struct sr_instance* sr)
 struct sr_rt *find_longest_prefix_match(struct sr_instance *sr, 
 uint32_t ip_dst) {
 	printf("Reached find longest prefix match fn\n");
-	sr_print_routing_table(sr);
-	/* TODO: Implement this */
+	
 	struct sr_rt* cur_routing_entry = sr->routing_table;
 	struct sr_rt *longest_match = NULL;
+
+	/*Loop through each entry to check for potential matches*/
 	while (cur_routing_entry != NULL) {
 
+		/*Compare the first x bits of the ip dest and the entry, where
+		x is the length of the mask */
 		uint32_t ip_dst_mask = ip_dst & cur_routing_entry->mask.s_addr;
 		if (ip_dst_mask == (cur_routing_entry->mask.s_addr & 
 			cur_routing_entry->dest.s_addr)){
-			/*Match found*/
-			printf("Match found\n");
+			
+			/*Match found; check if it is the longest match so far*/
 			if (longest_match == NULL || cur_routing_entry->mask.s_addr > 
 				longest_match->mask.s_addr){
 					longest_match = cur_routing_entry;
@@ -118,6 +121,7 @@ void add_ethernet_headers(struct sr_instance *sr, uint8_t
 	assert(casted_packet);
 
 	casted_packet->ether_type = htons(ethertype_ip);
+	/*Set destination address*/
 	memcpy(casted_packet->ether_dhost, (uint8_t*)mac, 6);
 
 	/* Find the src address from the outgoing interface */
@@ -145,7 +149,7 @@ uint8_t ip_dst, unsigned int len){
 	sr_ip_hdr_t *ip_hdr = (sr_ip_hdr_t*)packet;
 	assert(ip_hdr);
 	ip_hdr->ip_v = 0x04;
-	ip_hdr->ip_hl = 0x05; /*TODO Check that this is the right value */
+	ip_hdr->ip_hl = 0x05;
 	ip_hdr->ip_tos = 0x00;
 	ip_hdr->ip_len = htons(len); /*Length, including data e.g. ICMP hdr if present*/
 	ip_hdr->ip_id = htons(0x00);
@@ -154,7 +158,7 @@ uint8_t ip_dst, unsigned int len){
 	ip_hdr->ip_p = 0x00;
 	ip_hdr->ip_src = ip_src;
 	ip_hdr->ip_dst = ip_dst;
-	ip_hdr->ip_sum = 0; /*To prevent segfaults from uninitialized memory*/
+	ip_hdr->ip_sum = 0; /*Set to 0 first to ensure old cksum doesn't affect new one'*/
 	ip_hdr->ip_sum = cksum(packet, sizeof(sr_ip_hdr_t));
 	return;
 
@@ -175,7 +179,7 @@ uint8_t code, unsigned int len){
 	assert(len >= sizeof(struct sr_icmp_hdr));
 	struct sr_icmp_hdr *icmp_hdr = (struct sr_icmp_hdr*)packet;
 	assert(icmp_hdr);
-	icmp_hdr->icmp_sum = 0; /*Init so no segfault for uninitialized memory */
+	icmp_hdr->icmp_sum = 0; /*0 to ensure this field doesn't affect checksum calc*/
 	icmp_hdr->icmp_type = type;
 	icmp_hdr->icmp_code = code;
 	icmp_hdr->icmp_sum = cksum(packet, sizeof(struct sr_icmp_hdr));
@@ -236,8 +240,6 @@ void handle_ip_packet_to_be_sent_out(struct sr_instance *sr, uint8_t
 	assert(packet_with_ethernet);
 	sr_ip_hdr_t *ip_packet = (sr_ip_hdr_t*)(packet);
 	assert(ip_packet);
-	/*printf("The packet with ethernet headers added in is\n");
-	print_hdrs(packet_with_ethernet, len);*/
 
 	/* Make sure the packet is still alive before forwarding */
 	ip_packet->ip_ttl -= 1;
@@ -252,6 +254,7 @@ void handle_ip_packet_to_be_sent_out(struct sr_instance *sr, uint8_t
 			free(empty_packet);
 			return;
 		}
+		/*Send ICMP packet indicating TTL exceeded*/
 		sr_prep_and_send_icmp3_reply(sr, packet_with_ethernet, len + 
 			sizeof(sr_ethernet_hdr_t), 
 			interface, outgoing_interface->ip, ip_packet->ip_src,
@@ -266,11 +269,11 @@ void handle_ip_packet_to_be_sent_out(struct sr_instance *sr, uint8_t
 	calculation*/
 	uint16_t calculated_checksum = cksum(packet, sizeof(sr_ip_hdr_t));
 	ip_packet->ip_sum = calculated_checksum;
-	/*TODO: make sure checksum is updated in packet as well as ip_packet*/
 	
 	/*Find best-match IP address for this packet*/
 	struct sr_rt *best_match = find_longest_prefix_match(sr,
 	ip_packet->ip_dst);
+
 	if (best_match == NULL) {
 		fprintf(stderr, "No best match found\n");
 		struct sr_if *outgoing_interface = sr_get_interface(sr, interface);
@@ -280,6 +283,7 @@ void handle_ip_packet_to_be_sent_out(struct sr_instance *sr, uint8_t
 		}
 		uint8_t *empty_packet = (uint8_t*)calloc(1, len +sizeof(sr_ethernet_hdr_t));
 		assert(empty_packet);
+
 		sr_prep_and_send_icmp3_reply(sr, packet_with_ethernet, len +
 			sizeof(sr_ethernet_hdr_t), interface, outgoing_interface->ip, ip_packet->
 				ip_src, outgoing_interface->addr, ethernet_packet->ether_shost, 0x03, 
@@ -290,7 +294,7 @@ void handle_ip_packet_to_be_sent_out(struct sr_instance *sr, uint8_t
 
 	/* Check ARP cache for MAC address corresponding to the next-hop IP*/
 	struct sr_arpentry *arp_cache_entry = sr_arpcache_lookup(&(sr->cache), 
-	best_match->dest.s_addr);/**/
+	best_match->dest.s_addr);
 
 	if (arp_cache_entry == NULL) { /* No MAC addr found; make ARP req */
 		uint8_t *packet_with_ethernet = \
@@ -308,7 +312,7 @@ void handle_ip_packet_to_be_sent_out(struct sr_instance *sr, uint8_t
 		/*Add this request to the arpcache queued requests*/
 		struct sr_arpreq *arp_req = sr_arpcache_queuereq(&(sr->cache),
 			best_match->gw.s_addr, packet_with_ethernet, len + sizeof(sr_ethernet_hdr_t),
-			best_match->interface);/**/
+			best_match->interface);
 		
 		free(packet_with_ethernet);
 		if (arp_req == NULL){
@@ -322,44 +326,20 @@ void handle_ip_packet_to_be_sent_out(struct sr_instance *sr, uint8_t
 	}
 	else { /*MAC addr found; create and send IP request*/
 		printf("Found MAC; sending IP request\n");
-		/*uint8_t *new_packet = prepare_to_send_ip_req(sr, packet, len, 
-		best_match->interface, arp_cache_entry);
-		sr_ip_hdr_t *new_ip_packet = (sr_ip_hdr_t*)(new_packet + 
-			sizeof(sr_ethernet_hdr_t));
-		assert(new_ip_packet);
-		new_ip_packet->ip_sum = 0; Reset to 0 for consistency
-		new_ip_packet->ip_sum = cksum(new_ip_packet, sizeof(sr_ip_hdr_t));
-		Manually recalculating checksum for icmp packet, if it exists
-		if (new_ip_packet->ip_p == ip_protocol_icmp){
-			printf("The packet we are forwarding is an icmp packet\n");
-			struct sr_icmp_hdr *icmp_packet = (struct sr_icmp_hdr *)(new_packet +\
-				sizeof(sr_ip_hdr_t) +	sizeof(sr_ethernet_hdr_t));
-			assert(icmp_packet);
-			icmp_packet->icmp_sum = cksum(icmp_packet, sizeof(struct sr_icmp_hdr));
-		}
 
-		struct sr_if *outgoing_interface = sr_get_interface(sr, interface);
-		if (outgoing_interface == 0) {
-			printf("An error occurred; outgoing interface not found when forwarding\
-			the ip packet\n");
-			free(arp_cache_entry);
-			free(new_packet);
-			return;
-		}*/
 		int new_packet_len = ntohs(ip_packet->ip_len) + sizeof(sr_ethernet_hdr_t);
 		uint8_t *new_packet = (uint8_t*)calloc(1, new_packet_len);
 		assert(new_packet);
 		add_ethernet_headers(sr, new_packet, best_match->interface,
 			arp_cache_entry->mac);
+
+		/*Copy in the ip packet*/
 		memcpy(new_packet + sizeof(sr_ethernet_hdr_t), ip_packet, 
 			ntohs(ip_packet->ip_len));
 		
-
-		/*printf("Preparing to forward the following packet, where ip->mac mapping found\n");
-		print_hdrs(new_packet, new_packet_len);*/
 		int status = sr_send_packet(sr, new_packet, new_packet_len, best_match->interface);
 		if (status != 0){
-			printf("An error occurred when sending packet! Status %d\n", status);
+			fprintf(stderr, "An error occurred when sending packet! Status %d\n", status);
 		}
 		else {
 			printf("IP Packet sent out\n");
@@ -416,46 +396,25 @@ ether_dhost[ETHER_ADDR_LEN], uint8_t type, uint8_t code){
 	
 	printf("Reached sr_prep_and_send_icmp3_reply fn\n");
 	assert(full_packet);
-	/*unsigned int min_total_len = sizeof(sr_ethernet_hdr_t) + sizeof(
-	  sr_ip_hdr_t) + sizeof(sr_icmp_t3_hdr_t);
-	unsigned int icmp3_offset = sizeof(sr_ethernet_hdr_t) + sizeof(
-		sr_ip_hdr_t);
-	unsigned int ip_offset = sizeof(sr_ethernet_hdr_t);
-	assert(len >= min_total_len); 
-	
-	add_icmp3_headers(sr, packet + icmp3_offset, type, code,
-		len - icmp3_offset, packet + ip_offset);
-	add_ip_headers(sr, packet + ip_offset, ip_src, ip_dst, len - ip_offset);
-	sr_ip_hdr_t *ip_packet = (sr_ip_hdr_t*)(packet + ip_offset);
-	ip_packet->ip_p = ip_protocol_icmp; Make sure this is an icmp packet
-	
-	ip_packet->ip_dst = ip_dst;
-	ip_packet->ip_src = ip_src;
-	ip_packet->ip_sum = 0;
-  ip_packet->ip_sum = cksum(packet + ip_offset, ip_packet->ip_len);
-	printf("The IP dst after assigning to the packet is \n");
-  print_addr_ip_int(ntohl(ip_packet->ip_dst));
 
-	add_ethernet_headers(sr, packet, interface, ether_dhost);
-	sr_ethernet_hdr_t *ethernet_packet = (sr_ethernet_hdr_t*)packet;
-	assert(ethernet_packet);
-	memcpy(ethernet_packet->ether_shost, ether_shost, ETHER_ADDR_LEN);*/
 	uint8_t* new_packet = calloc(1, len);
 	assert(new_packet);
 	sr_ethernet_hdr_t *new_ethernet_packet = (sr_ethernet_hdr_t*)new_packet;
 	assert(new_ethernet_packet);
 	add_ethernet_headers(sr, new_packet, interface, ether_dhost);
 
+	/*Take some fields from the old ethernet packet*/
 	sr_ethernet_hdr_t *ethernet_packet = (sr_ethernet_hdr_t*)full_packet;
   assert(ethernet_packet);
   uint8_t temp_src[ETHER_ADDR_LEN];
   uint8_t temp_dst[ETHER_ADDR_LEN];
   memcpy(temp_src, ether_shost, ETHER_ADDR_LEN);
   memcpy(temp_dst, ether_dhost, ETHER_ADDR_LEN);
- 
+
   memcpy(new_ethernet_packet->ether_shost, temp_src, ETHER_ADDR_LEN);
   memcpy(new_ethernet_packet->ether_dhost, temp_dst, ETHER_ADDR_LEN);
- 
+	
+	/*Set the fields of the ip portion*/
   sr_ip_hdr_t *ip_packet = (sr_ip_hdr_t*)(full_packet +\
 		sizeof(sr_ethernet_hdr_t));
   assert(ip_packet);
@@ -468,10 +427,11 @@ ether_dhost[ETHER_ADDR_LEN], uint8_t type, uint8_t code){
 	memcpy(new_packet + sizeof(sr_ethernet_hdr_t), ip_packet, 
 		sizeof(sr_ip_hdr_t));
 
-	unsigned int ip_data_length = ntohs(ip_packet->ip_len) - sizeof(sr_ip_hdr_t);
+	/*TODO: Experiment with the checksum here, and the making ARP request*/
+	/*unsigned int ip_data_length = ntohs(ip_packet->ip_len) - sizeof(sr_ip_hdr_t);*/
  
+ /*Initialize ICMP packet and set values*/
   sr_icmp_t3_hdr_t icmp3_packet;
-  /*assert(icmp3_packet);*/
   icmp3_packet.icmp_type = type;
   icmp3_packet.icmp_code = code;
 	icmp3_packet.unused = 0;
@@ -482,6 +442,7 @@ ether_dhost[ETHER_ADDR_LEN], uint8_t type, uint8_t code){
   icmp3_packet.icmp_sum = cksum(new_packet + sizeof(sr_ethernet_hdr_t) +\
      sizeof(sr_ip_hdr_t), sizeof(sr_icmp_t3_hdr_t));
 	
+	/*Add the icmp portion to the overall packet*/
 	memcpy(new_packet + sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t),
 		&icmp3_packet, sizeof(sr_icmp_t3_hdr_t));
 
@@ -492,7 +453,8 @@ ether_dhost[ETHER_ADDR_LEN], uint8_t type, uint8_t code){
   }
 	printf("Preparing to send following icmp3 packet from prep&send fn\n");
 	print_hdrs(new_packet, len);
-
+	
+	/*Send out & delete the new packet*/
 	int status = sr_send_packet(sr, new_packet, len, best_match->interface);
 	free(new_packet);
 	if (status != 0) {
@@ -502,50 +464,6 @@ ether_dhost[ETHER_ADDR_LEN], uint8_t type, uint8_t code){
 	printf("Sent icmp reply\n");
 	return;
 }
-
-
-
-
-	/*sr_ethernet_hdr_t *ethernet_packet = (sr_ethernet_hdr_t*)packet;
-	assert(ethernet_packet);
-	memcpy(ethernet_packet->ether_dhost, ether_dhost, ETHER_ADDR_LEN);
-	memcpy(ethernet_packet->ether_shost, ether_shost, ETHER_ADDR_LEN);
-	ethernet_packet->ether_type = htons(ethertype_ip);
-				
-	sr_ip_hdr_t *ip_packet = (sr_ip_hdr_t*)(packet + sizeof(sr_ethernet_hdr_t));
-	assert(ip_packet);
-	ip_packet->ip_v = 4;
-	ip_packet->ip_hl = 5;
-	ip_packet->ip_tos = 0;
-	ip_packet->ip_len = sizeof(sr_ip_hdr_t);
-	ip_packet->ip_id = 0;
-	ip_packet->ip_off = 0;
-	ip_packet->ip_ttl = 64;
-	ip_packet->ip_p = 0x01;
-	ip_packet->ip_src = ip_src;
-	ip_packet->ip_dst = ip_dst;
-	ip_packet->ip_sum = 0;
-	ip_packet->ip_sum = cksum(packet + sizeof(sr_ethernet_hdr_t), ip_packet->ip_len);
-
-	struct sr_icmp_hdr *icmp_packet = (struct sr_icmp_hdr*)(packet +\
-		sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t));
-	assert(icmp_packet);
-	icmp_packet->icmp_type = type;
-	icmp_packet->icmp_code = code;
-	icmp_packet->icmp_sum = 0;
-	icmp_packet->icmp_sum = cksum(packet + sizeof(sr_ethernet_hdr_t) +\
-		sizeof(sr_ip_hdr_t), sizeof(struct sr_icmp_hdr));*/
-
-	/*printf("About to send the following packet\n");
-	print_hdrs(packet, len);
-  int status = sr_send_packet(sr, packet, len, interface);
-	if (status != 0){
-		fprintf(stderr, "Error when sending icmp3 reply\n");
-		return;
-	}
-	printf("Sent icmp3 reply\n");
-	return;
-}*/
 
 /*----------------------------------------------------------------------
 * Method: sr_prep_and_send_icmp_reply(struct sr_instance *sr, 
@@ -569,36 +487,12 @@ uint8_t ether_shost[ETHER_ADDR_LEN], uint8_t ether_dhost[ETHER_ADDR_LEN]) {
 	assert(interface);
 	unsigned int min_total_len = sizeof(sr_ethernet_hdr_t) + sizeof(
 		sr_ip_hdr_t) + sizeof(sr_icmp_hdr_t);
-	/*unsigned int icmp_offset = sizeof(sr_ethernet_hdr_t) + sizeof(
-		sr_ip_hdr_t);
-	unsigned int ip_offset = sizeof(sr_ethernet_hdr_t);*/
+
 	assert(len >= min_total_len);
 
-  /*printf("The ip src & dst is\n");
-	print_addr_ip_int(ntohl(ip_src));
-	print_addr_ip_int(ntohl(ip_dst));
-	printf("The ethernet src & dst is\n");
-	print_addr_eth(ether_shost);
-	print_addr_eth(ether_dhost);
-	printf("Sizeof icmp is %lu\n", sizeof(sr_icmp_hdr_t));
-	printf("Sizeof ip is %lu\n", sizeof(sr_ip_hdr_t));
-	printf("Sizeof ethernet is %lu\n", sizeof(sr_ethernet_hdr_t));*/
-	
-	/*Add all three headers*/
-	/*add_icmp_headers(sr, packet + icmp_offset, 0x00, 0x00, 
-		len - icmp_offset);
-	add_ip_headers(sr, packet + ip_offset, ip_src, ip_dst, len - ip_offset);
-	add_ethernet_headers(sr, packet, interface, ether_dhost);
-	
-	Overwrite source host of ethernet packet to ensure correctness
 	sr_ethernet_hdr_t *ethernet_packet = (sr_ethernet_hdr_t*)packet;
 	assert(ethernet_packet);
-	memcpy(ethernet_packet->ether_shost, ether_shost, ETHER_ADDR_LEN);*/
-	/*printf("Packet at start of icmp fn is \n");
-	print_hdrs(packet, len);*/
-	sr_ethernet_hdr_t *ethernet_packet = (sr_ethernet_hdr_t*)packet;
-	assert(ethernet_packet);
-	/*memcpy(ethernet_packet->ether_dhost, ether_dhost, ETHER_ADDR_LEN);*/
+
 	uint8_t temp_src[ETHER_ADDR_LEN];
 	uint8_t temp_dst[ETHER_ADDR_LEN];
 	memcpy(temp_src, ether_shost, ETHER_ADDR_LEN);
@@ -651,53 +545,6 @@ uint8_t ether_shost[ETHER_ADDR_LEN], uint8_t ether_dhost[ETHER_ADDR_LEN]) {
 		}
 		return;
 	}
-
-	/*uint8_t *new_packet = calloc(1, len);
-
-	sr_ethernet_hdr_t *ethernet_packet = (sr_ethernet_hdr_t*)new_packet;
-	assert(ethernet_packet);
-	memcpy(ethernet_packet->ether_dhost, ether_dhost, ETHER_ADDR_LEN);
-	memcpy(ethernet_packet->ether_shost, ether_shost, ETHER_ADDR_LEN);
-	ethernet_packet->ether_type = htons(ethertype_ip);
-
-	sr_ip_hdr_t *ip_packet = (sr_ip_hdr_t*)(new_packet +\
-		sizeof(sr_ethernet_hdr_t));
-	assert(ip_packet);
-	ip_packet->ip_v = 4;
-	ip_packet->ip_hl = 5;
-	ip_packet->ip_tos = 0;
-	ip_packet->ip_len = htons(len - sizeof(sr_ethernet_hdr_t));
-	ip_packet->ip_id = 0;
-	ip_packet->ip_off = 0;
-	ip_packet->ip_ttl = 64;
-	ip_packet->ip_p = 0x01;
-	ip_packet->ip_src = ip_src;
-	ip_packet->ip_dst = ip_dst;
-	ip_packet->ip_sum = 0;
-	ip_packet->ip_sum = cksum(new_packet + sizeof(sr_ethernet_hdr_t), 
-		ip_packet->ip_len);
-	
-	struct sr_icmp_hdr *icmp_packet = (struct sr_icmp_hdr*)(new_packet +\
-		sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t));
-	assert(icmp_packet);
-
-	icmp_packet->icmp_type = 0;
-	icmp_packet->icmp_code = 0;
-	icmp_packet->icmp_sum = 0;
-	icmp_packet->icmp_sum = cksum(new_packet + sizeof(sr_ethernet_hdr_t) +\
-		sizeof(sr_ip_hdr_t), sizeof(struct sr_icmp_hdr));
-	
-	struct sr_rt *best_match = find_longest_prefix_match(sr,
-		ip_packet->ip_dst);
-	if (best_match == NULL) {
-		fprintf(stderr, "No best match found\n");
-	}*/
-
-		
-
-	/*printf("About to send packet from icmp reply fn\n");
-
-	print_hdrs(packet, len);*/
 
 	memcpy(ethernet_packet->ether_dhost, arp_cache_entry->mac, 
 		ETHER_ADDR_LEN);
