@@ -188,12 +188,22 @@ unsigned int len, char *interface){
 	while (cur_packet != NULL){
 		sr_ethernet_hdr_t *ethernet_buf = (sr_ethernet_hdr_t*)cur_packet->buf;
 		assert(ethernet_buf);
+		sr_ip_hdr_t *ip_packet = (sr_ip_hdr_t*)(cur_packet->buf + 
+			sizeof(sr_ethernet_hdr_t));
+		assert(ip_packet);
 
 		/*Set the newly discovered destination MAC address*/
 		memcpy(ethernet_buf->ether_dhost, arp_header->ar_sha, ETHER_ADDR_LEN);
+		sr_icmp_hdr_t *icmp_packet = (sr_icmp_hdr_t*)(cur_packet->buf + 
+			sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t));
+		assert(icmp_packet);
+		icmp_packet->icmp_sum = 0;
+		icmp_packet->icmp_sum = cksum(cur_packet->buf + 
+			sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t), ntohs(ip_packet->ip_len)
+			- sizeof(sr_ip_hdr_t));
 		printf("Preparing to send out the following queued IP packet\n");
-		/*print_hdrs(cur_packet->buf, cur_packet->len);
-		printf("printed=====================================================\n");*/
+		print_hdrs(cur_packet->buf, cur_packet->len);
+		printf("printed=====================================================\n");
 		int status = sr_send_packet(sr, cur_packet->buf, cur_packet->len,
 			cur_packet->iface);
 		if (status != 0){

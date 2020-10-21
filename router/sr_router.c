@@ -483,7 +483,7 @@ ether_dhost[ETHER_ADDR_LEN], uint8_t type, uint8_t code){
      sizeof(sr_ip_hdr_t), ip_data_length);
 	
 	memcpy(new_packet + sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t),
-		&icmp3_packet, sizeof(sr_icmp_t3_hdr_t));
+		&icmp3_packet, ip_data_length);
 
   struct sr_rt *best_match = find_longest_prefix_match(sr,
 		ip_packet->ip_dst);
@@ -576,11 +576,11 @@ uint8_t ether_shost[ETHER_ADDR_LEN], uint8_t ether_dhost[ETHER_ADDR_LEN]) {
 
   /*printf("The ip src & dst is\n");
 	print_addr_ip_int(ntohl(ip_src));
-	print_addr_ip_int(ntohl(ip_dst));
+	print_addr_ip_int(ntohl(ip_dst));*/
 	printf("The ethernet src & dst is\n");
 	print_addr_eth(ether_shost);
 	print_addr_eth(ether_dhost);
-	printf("Sizeof icmp is %lu\n", sizeof(sr_icmp_hdr_t));
+	/*printf("Sizeof icmp is %lu\n", sizeof(sr_icmp_hdr_t));
 	printf("Sizeof ip is %lu\n", sizeof(sr_ip_hdr_t));
 	printf("Sizeof ethernet is %lu\n", sizeof(sr_ethernet_hdr_t));*/
 	
@@ -631,15 +631,15 @@ uint8_t ether_shost[ETHER_ADDR_LEN], uint8_t ether_dhost[ETHER_ADDR_LEN]) {
 		fprintf(stderr, "No best match found\n");
 		return;
 	}
-	/*
-	/*Check ARP cache for MAC address corresponding to next-hop ip
+	
+	/*Check ARP cache for MAC address corresponding to next-hop ip*/
 	struct sr_arpentry *arp_cache_entry = sr_arpcache_lookup(&(sr->cache),
 		best_match->dest.s_addr);
 	
 	if (arp_cache_entry == NULL){
 		/*unsigned char broadcast_mac[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};*/
 		/*TODO: Might have to make the ethernet packets destination address
-		the broadcast addr
+		the broadcast addr*/
 		
 		struct sr_arpreq *arp_req = sr_arpcache_queuereq(&(sr->cache), 
 			best_match->gw.s_addr, packet, len, best_match->interface);
@@ -650,7 +650,7 @@ uint8_t ether_shost[ETHER_ADDR_LEN], uint8_t ether_dhost[ETHER_ADDR_LEN]) {
 			return;
 		}
 		return;
-	}*/
+	}
 
 	/*uint8_t *new_packet = calloc(1, len);
 
@@ -695,15 +695,15 @@ uint8_t ether_shost[ETHER_ADDR_LEN], uint8_t ether_dhost[ETHER_ADDR_LEN]) {
 
 		
 
-	/*printf("About to send packet from icmp reply fn\n");
+	printf("About to send packet from icmp reply fn\n");
 
-	print_hdrs(packet, len);*/
+	print_hdrs(packet, len);
 
-	/*memcpy(ethernet_packet->ether_dhost, arp_cache_entry->mac, 
-		ETHER_ADDR_LEN);*/
+	memcpy(ethernet_packet->ether_dhost, arp_cache_entry->mac, 
+		ETHER_ADDR_LEN);
 
 	int status = sr_send_packet(sr, packet, len, best_match->interface);
-	/*free(arp_cache_entry);*/
+	free(arp_cache_entry);
 	if (status != 0) {
 		fprintf(stderr, "Error when sending icmp reply\n");
 		return;
