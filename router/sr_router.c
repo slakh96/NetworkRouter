@@ -409,9 +409,6 @@ ether_dhost[ETHER_ADDR_LEN], uint8_t type, uint8_t code){
 		sizeof(sr_ip_hdr_t));
 	memcpy(new_packet + sizeof(sr_ethernet_hdr_t), ip_packet, 
 		sizeof(sr_ip_hdr_t));
-
-	/*TODO: Experiment with the checksum here, and the making ARP request*/
-	/*unsigned int ip_data_length = ntohs(ip_packet->ip_len) - sizeof(sr_ip_hdr_t);*/
  
  /*Initialize ICMP packet and set values*/
   sr_icmp_t3_hdr_t icmp3_packet;
@@ -449,8 +446,6 @@ ether_dhost[ETHER_ADDR_LEN], uint8_t type, uint8_t code){
 	}
 	memcpy(new_ethernet_packet->ether_dhost, arp_cache_entry->mac, 
 		ETHER_ADDR_LEN);
-
-
 
 	/*Send out & delete the new packet*/
 	int status = sr_send_packet(sr, new_packet, len, best_match->interface);
