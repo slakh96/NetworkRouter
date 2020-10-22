@@ -444,6 +444,7 @@ ether_dhost[ETHER_ADDR_LEN], uint8_t type, uint8_t code){
 			best_match->gw.s_addr, new_packet, len, best_match->interface);
 		assert(arp_req);
 		sr_handle_arpreq(sr, arp_req);
+		free(new_packet);
 		return;
 	}
 	memcpy(new_ethernet_packet->ether_dhost, arp_cache_entry->mac, 
