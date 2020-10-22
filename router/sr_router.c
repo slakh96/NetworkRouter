@@ -435,6 +435,22 @@ ether_dhost[ETHER_ADDR_LEN], uint8_t type, uint8_t code){
 		return;
   }
 	
+	struct sr_arpentry *arp_cache_entry = sr_arpcache_lookup(&(sr->cache), 
+		best_match->dest.s_addr);
+	
+	if(arp_cache_entry == NULL){
+		/*No MAC addr; make ARP request*/
+		struct sr_arpreq *arp_req = sr_arpcache_queuereq(&(sr->cache), 
+			best_match->gw.s_addr, new_packet, len, best_match->interface);
+		assert(arp_req);
+		sr_handle_arpreq(sr, arp_req);
+		return;
+	}
+	memcpy(new_ethernet_packet->ether_dhost, arp_cache_entry->mac, 
+		ETHER_ADDR_LEN);
+
+
+
 	/*Send out & delete the new packet*/
 	int status = sr_send_packet(sr, new_packet, len, best_match->interface);
 	free(new_packet);
@@ -522,6 +538,7 @@ uint8_t ether_shost[ETHER_ADDR_LEN], uint8_t ether_dhost[ETHER_ADDR_LEN]) {
 				starter code was NULL\n");
 			return;
 		}
+		sr_handle_arpreq(sr, arp_req);
 		return;
 	}
 
