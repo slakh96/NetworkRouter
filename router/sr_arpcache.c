@@ -28,7 +28,6 @@ cache.
 struct sr_arp_hdr create_arp_hdr(unsigned short ar_op, uint32_t ar_sip,
 uint32_t ar_tip, unsigned char ar_sha[6], unsigned char ar_tha[6]){
 	
-	printf("Reached create_arp_hdr fn\n");
 	struct sr_arp_hdr arp_hdr;
 	arp_hdr.ar_op = htons(ar_op);
 	arp_hdr.ar_sip = ar_sip;
@@ -54,7 +53,6 @@ unsigned short ar_op, uint32_t ar_sip,
 uint32_t ar_tip, unsigned char ar_sha[6], unsigned char ar_tha[6],
 unsigned short outgoing_opcode){
 
-	printf("Reached sr_prep_and_send_arpreq\n");
 	assert(sr);
 	assert(interface);
 	unsigned int eth_pkt_size = sizeof(struct sr_arp_hdr) +\
@@ -77,7 +75,6 @@ unsigned short outgoing_opcode){
 	
 	int status = sr_send_packet(sr, packet_with_ethernet, eth_pkt_size,
 		interface);
-	printf("Sent ARP packet\n");
 	if (status != 0){
 		fprintf(stderr, "Error when sending ARP req\n");
 		free(packet_with_ethernet);
@@ -183,7 +180,6 @@ struct sr_if *find_addressed_interface(struct sr_instance *sr, uint32_t ip){
 void sr_handle_arp_reply(struct sr_instance *sr, sr_arp_hdr_t* arp_header,
 unsigned int len, char *interface){
 
-	printf("Reached sr_handle_arp_reply function\n");
 	assert(sr);
 	assert(arp_header);
 	assert(interface);
@@ -192,7 +188,6 @@ unsigned int len, char *interface){
 	struct sr_arpreq *arpreq = sr_arpcache_insert(&(sr->cache), 
 	arp_header->ar_sha, arp_header->ar_sip);
 	if (arpreq == NULL){
-		printf("No one is waiting on this packet\n");
 		return; /*No packets were waiting on this mapping*/
 	}
 
@@ -204,7 +199,6 @@ unsigned int len, char *interface){
 
 		/*Set the newly discovered destination MAC address*/
 		memcpy(ethernet_buf->ether_dhost, arp_header->ar_sha, ETHER_ADDR_LEN);
-		printf("Preparing to send out a queued IP packet\n");
 
 		int status = sr_send_packet(sr, cur_packet->buf, cur_packet->len,
 			cur_packet->iface);
@@ -215,7 +209,6 @@ unsigned int len, char *interface){
 		cur_packet = next_packet;
 	}
 	/*Delete the ARP request once all of the packets have been sent */
-	printf("Sent all of the packets, deleting the ARP request\n");
 	sr_arpreq_destroy(&(sr->cache), arpreq);
 
 }
@@ -234,7 +227,6 @@ unsigned int len, char *interface){
 void sr_handle_arp_packet(struct sr_instance *sr, uint8_t *packet, unsigned
 int len, char *interface){
 	
-	printf("Reached the sr_handle_arp_packet function\n");
 	assert(sr);
 	assert(packet);
 	assert(interface);
@@ -246,7 +238,7 @@ int len, char *interface){
 	struct sr_if *addressed_interface =\
 		find_addressed_interface(sr, arp_header->ar_tip);
 	if (addressed_interface == NULL){
-		printf("This ARP packet is not addressed to us; ignore\n");
+		/*This packet not addressed to us*/
 		return;
 	}
 	if (ntohs(arp_header->ar_op) == arp_op_request){

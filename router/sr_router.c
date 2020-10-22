@@ -67,7 +67,6 @@ void sr_init(struct sr_instance* sr)
 
 struct sr_rt *find_longest_prefix_match(struct sr_instance *sr, 
 uint32_t ip_dst) {
-	printf("Reached find longest prefix match fn\n");
 	
 	struct sr_rt* cur_routing_entry = sr->routing_table;
 	struct sr_rt *longest_match = NULL;
@@ -90,13 +89,6 @@ uint32_t ip_dst) {
 
 		cur_routing_entry = cur_routing_entry->next;
 	}
-	if (longest_match){
-		printf("The best match is:\n");
-		sr_print_routing_entry(longest_match);
-	}
-	else {
-		printf("No longest prefix match found\n");
-	}
 	return longest_match;
 }
 
@@ -114,7 +106,6 @@ uint32_t ip_dst) {
 void add_ethernet_headers(struct sr_instance *sr, uint8_t 
 *packet, char *interface, unsigned char mac[6]){
 
-	printf("Reached add_ethernet_headers function\n");
 	assert(sr);
 	assert(packet);
 	assert(interface);
@@ -231,7 +222,6 @@ uint8_t *prepare_to_send_ip_req(struct sr_instance *sr, uint8_t
 
 void handle_ip_packet_to_be_sent_out(struct sr_instance *sr, uint8_t 
 *packet, unsigned int len, char *interface, uint8_t *packet_with_ethernet){
-	printf("Reached the handle_ip_packet_to_be_sent_out fn\n");
 	assert(sr);
 	assert(packet);
 	assert(interface);
@@ -245,7 +235,6 @@ void handle_ip_packet_to_be_sent_out(struct sr_instance *sr, uint8_t
 	/* Make sure the packet is still alive before forwarding */
 	ip_packet->ip_ttl -= 1;
 	if (ip_packet->ip_ttl <= 0) {
-		fprintf(stderr, "This packet has a TTL of 0; cannot send it\n");
 		uint8_t *empty_packet = (uint8_t*)calloc(1, len +sizeof(sr_ethernet_hdr_t));
 		assert(empty_packet);
 		
@@ -276,7 +265,6 @@ void handle_ip_packet_to_be_sent_out(struct sr_instance *sr, uint8_t
 	ip_packet->ip_dst);
 
 	if (best_match == NULL) {
-		fprintf(stderr, "No best match found\n");
 		struct sr_if *outgoing_interface = sr_get_interface(sr, interface);
 		if (outgoing_interface == NULL){
 		  fprintf(stderr, "Error outgoing interface not found\n");
@@ -321,12 +309,10 @@ void handle_ip_packet_to_be_sent_out(struct sr_instance *sr, uint8_t
 			starter code was NULL....\n");
 			return;
 		}
-		printf("Handling the new ARP request now\n");
 		/*Send out request for the MAC address*/
 		sr_handle_arpreq(sr, arp_req);
 	}
 	else { /*MAC addr found; create and send IP request*/
-		printf("Found MAC; sending IP request\n");
 
 		int new_packet_len = ntohs(ip_packet->ip_len) + sizeof(sr_ethernet_hdr_t);
 		uint8_t *new_packet = (uint8_t*)calloc(1, new_packet_len);
@@ -341,9 +327,6 @@ void handle_ip_packet_to_be_sent_out(struct sr_instance *sr, uint8_t
 		int status = sr_send_packet(sr, new_packet, new_packet_len, best_match->interface);
 		if (status != 0){
 			fprintf(stderr, "An error occurred when sending packet! Status %d\n", status);
-		}
-		else {
-			printf("IP Packet sent out\n");
 		}
 		free(arp_cache_entry);
 		free(new_packet);
@@ -395,7 +378,6 @@ uint8_t *full_packet, unsigned int len, char *interface, uint32_t ip_src,
 uint32_t ip_dst, uint8_t ether_shost[ETHER_ADDR_LEN], uint8_t 
 ether_dhost[ETHER_ADDR_LEN], uint8_t type, uint8_t code){
 	
-	printf("Reached sr_prep_and_send_icmp3_reply fn\n");
 	assert(full_packet);
 
 	uint8_t* new_packet = calloc(1, len);
@@ -450,9 +432,8 @@ ether_dhost[ETHER_ADDR_LEN], uint8_t type, uint8_t code){
 		ip_packet->ip_dst);
   if (best_match == NULL) {
   	fprintf(stderr, "No best match found\n");
+		return;
   }
-	printf("Preparing to send following icmp3 packet from prep&send fn\n");
-	print_hdrs(new_packet, len);
 	
 	/*Send out & delete the new packet*/
 	int status = sr_send_packet(sr, new_packet, len, best_match->interface);
@@ -461,7 +442,6 @@ ether_dhost[ETHER_ADDR_LEN], uint8_t type, uint8_t code){
 		fprintf(stderr, "Error when sending icmp reply\n");
 	  return;
 	}
-	printf("Sent icmp reply\n");
 	return;
 }
 
@@ -481,7 +461,6 @@ void sr_prep_and_send_icmp_reply(struct sr_instance *sr, uint8_t *packet,
 unsigned int len, char *interface, uint32_t ip_src, uint32_t ip_dst, 
 uint8_t ether_shost[ETHER_ADDR_LEN], uint8_t ether_dhost[ETHER_ADDR_LEN]) {
 	
-	printf("Arrived in the sr_prep_and_send_icmp_reply\n");
 	assert(packet);
 	assert(sr);
 	assert(interface);
@@ -555,7 +534,6 @@ uint8_t ether_shost[ETHER_ADDR_LEN], uint8_t ether_dhost[ETHER_ADDR_LEN]) {
 		fprintf(stderr, "Error when sending icmp reply\n");
 		return;
 	}
-	printf("Sent icmp reply\n");
 	return;
 
 }
@@ -572,7 +550,6 @@ uint8_t ether_shost[ETHER_ADDR_LEN], uint8_t ether_dhost[ETHER_ADDR_LEN]) {
 void sr_handle_icmp_request(struct sr_instance *sr, uint8_t *packet,
 unsigned int len, char *interface){
 
-	printf("Reached sr_handle_icmp_request\n");	
 	unsigned int icmp_offset = sizeof(sr_ethernet_hdr_t) + sizeof(
 		sr_ip_hdr_t);
 	sr_icmp_hdr_t *icmp_packet = (sr_icmp_hdr_t*)(packet + icmp_offset);
@@ -630,7 +607,6 @@ unsigned int len, char *interface){
 void process_ip_packet(struct sr_instance *sr, uint8_t *packet, unsigned
 int len, char *interface, uint8_t* packet_with_ethernet){
 
-	printf("Arrived in process_ip_packet function\n");
 	assert(sr);
 	assert(packet);
 	assert(interface);
@@ -656,7 +632,6 @@ int len, char *interface, uint8_t* packet_with_ethernet){
 	find_addressed_interface(sr, ip_packet->ip_dst);
 
 	if (addressed_interface != NULL){
-		printf("Found a packet addressed to this router\n");
 		
 		/*Check if icmp request */
 		if (ip_packet->ip_p == ip_protocol_icmp) {
@@ -666,7 +641,6 @@ int len, char *interface, uint8_t* packet_with_ethernet){
 		}
 		/*Check if TCP or UDP packet*/
 		else if (ip_packet->ip_p == 0x0006 || ip_packet->ip_p == 0x0011){
-			printf("Found TCP or UDP packet addressed to us\n");
 			struct sr_if *outgoing_interface = sr_get_interface(sr, interface);
 			if (outgoing_interface == NULL){
 				fprintf(stderr, "Outgoing interface null when trying to send resp\
@@ -689,7 +663,6 @@ int len, char *interface, uint8_t* packet_with_ethernet){
 	}
 
 	/* If the code reaches here, it is not addressed to this router */
-	printf("This packet is not addressed to us, try to forward it\n");
 	handle_ip_packet_to_be_sent_out(sr, packet, len, interface,
 		packet_with_ethernet);	
 }
@@ -731,7 +704,6 @@ void sr_handlepacket(struct sr_instance* sr,
 	uint16_t ethtype = ethertype(packet);
 
 	if (ethtype == ethertype_ip){
-		printf("Found IP packet\n");
 		int minIPLength = minEthernetLength + sizeof(sr_ip_hdr_t);
 		
 		if (len < minIPLength) {
@@ -740,14 +712,12 @@ void sr_handlepacket(struct sr_instance* sr,
 		}
 		else {
 			/* Handle IP packet */
-			printf("IP packet has sufficient length \n");
 			process_ip_packet(sr, packet + sizeof(sr_ethernet_hdr_t), 
 				len - sizeof(sr_ethernet_hdr_t), interface, packet);
 				return;
 		}
 	}
 	else if (ethtype == ethertype_arp) {
-		printf("Found ARP packet \n");
 		int minARPLength = minEthernetLength + sizeof(sr_arp_hdr_t);
 		
 		if (len < minARPLength) {
@@ -755,7 +725,6 @@ void sr_handlepacket(struct sr_instance* sr,
 			return;
 		}
 		else {
-			printf("ARP packet has sufficient length \n");
 			sr_handle_arp_packet(sr, packet +\
 				sizeof(sr_ethernet_hdr_t), len -\
 				sizeof(sr_ethernet_hdr_t), interface);
