@@ -379,8 +379,9 @@ uint32_t ip_dst, uint8_t ether_shost[ETHER_ADDR_LEN], uint8_t
 ether_dhost[ETHER_ADDR_LEN], uint8_t type, uint8_t code){
 	
 	assert(full_packet);
-
-	uint8_t* new_packet = calloc(1, len);
+	int new_pkt_len = sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t) +\
+		sizeof(sr_icmp_t3_hdr_t);
+	uint8_t* new_packet = calloc(1, new_pkt_len);
 	assert(new_packet);
 	sr_ethernet_hdr_t *new_ethernet_packet = (sr_ethernet_hdr_t*)new_packet;
 	assert(new_ethernet_packet);
@@ -409,9 +410,6 @@ ether_dhost[ETHER_ADDR_LEN], uint8_t type, uint8_t code){
 		sizeof(sr_ip_hdr_t));
 	memcpy(new_packet + sizeof(sr_ethernet_hdr_t), ip_packet, 
 		sizeof(sr_ip_hdr_t));
-
-	/*TODO: Experiment with the checksum here, and the making ARP request*/
-	/*unsigned int ip_data_length = ntohs(ip_packet->ip_len) - sizeof(sr_ip_hdr_t);*/
  
  /*Initialize ICMP packet and set values*/
   sr_icmp_t3_hdr_t icmp3_packet;
@@ -429,7 +427,7 @@ ether_dhost[ETHER_ADDR_LEN], uint8_t type, uint8_t code){
 		&icmp3_packet, sizeof(sr_icmp_t3_hdr_t));
 
   struct sr_rt *best_match = find_longest_prefix_match(sr,
-		ip_packet->ip_dst);
+		ip_dst);
   if (best_match == NULL) {
   	fprintf(stderr, "No best match found\n");
 		return;
@@ -441,7 +439,7 @@ ether_dhost[ETHER_ADDR_LEN], uint8_t type, uint8_t code){
 	if(arp_cache_entry == NULL){
 		/*No MAC addr; make ARP request*/
 		struct sr_arpreq *arp_req = sr_arpcache_queuereq(&(sr->cache), 
-			best_match->gw.s_addr, new_packet, len, best_match->interface);
+			best_match->gw.s_addr, new_packet, new_pkt_len, best_match->interface);
 		assert(arp_req);
 		sr_handle_arpreq(sr, arp_req);
 		return;
