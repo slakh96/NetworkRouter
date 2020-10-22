@@ -429,7 +429,7 @@ ether_dhost[ETHER_ADDR_LEN], uint8_t type, uint8_t code){
 		sizeof(sr_ip_hdr_t));
 
 	/*TODO: Experiment with the checksum here, and the making ARP request*/
-	unsigned int ip_data_length = ntohs(ip_packet->ip_len) - sizeof(sr_ip_hdr_t);
+	/*unsigned int ip_data_length = ntohs(ip_packet->ip_len) - sizeof(sr_ip_hdr_t);*/
  
  /*Initialize ICMP packet and set values*/
   sr_icmp_t3_hdr_t icmp3_packet;
@@ -440,8 +440,7 @@ ether_dhost[ETHER_ADDR_LEN], uint8_t type, uint8_t code){
   memcpy(icmp3_packet.data, ip_packet, ICMP_DATA_SIZE);
 
   icmp3_packet.icmp_sum = 0;
-  icmp3_packet.icmp_sum = cksum(new_packet + sizeof(sr_ethernet_hdr_t) +\
-     sizeof(sr_ip_hdr_t), ip_data_length);
+  icmp3_packet.icmp_sum = cksum(&icmp3_packet, sizeof(sr_icmp_t3_hdr_t));
 	
 	/*Add the icmp portion to the overall packet*/
 	memcpy(new_packet + sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t),
@@ -674,8 +673,6 @@ int len, char *interface, uint8_t* packet_with_ethernet){
 					to TCP/UDP packet\n");
 				return;
 			}
-			uint8_t *new_packet = (uint8_t*)calloc(1, len+sizeof(sr_ethernet_hdr_t));
-			assert(new_packet);
 
 			/*Send icmp reply regarding the TCP/UDP packet*/
 			sr_prep_and_send_icmp3_reply(sr, packet_with_ethernet,	len + 
